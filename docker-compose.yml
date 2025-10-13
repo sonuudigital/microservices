@@ -1,0 +1,81 @@
+services:
+  api-gateway:
+    container_name: api-gateway
+    hostname: api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/deploy/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      USER_SERVICE_URL: http://user-service:8081
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_TTL_MINUTES: ${JWT_TTL_MINUTES}
+    depends_on:
+      - user-service
+    networks:
+      - ecommerce-network
+
+  user-service:
+    container_name: user-service
+    hostname: user-service
+    build:
+      context: .
+      dockerfile: user-service/deploy/Dockerfile
+    environment:
+      PORT: 8081
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:5432/${POSTGRES_DB}?sslmode=disable
+      MIGRATIONS_DIR: /migrations
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+
+  user-db:
+    image: postgres:18-alpine
+    container_name: user-db
+    hostname: user-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:9.8.0
+    hostname: pgadmin
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "8888:80"
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+networks:
+  ecommerce-network:
+    driver: bridge
+
+volumes:
+  user_db_data:
+  pgadmin_data:

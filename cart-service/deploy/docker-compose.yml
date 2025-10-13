@@ -1,0 +1,21 @@
+services:
+  cart-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: carts
+      POSTGRES_USER: cart_user
+      POSTGRES_PASSWORD: cart_password
+    ports:
+      - "5433:5433"
+    volumes:
+      - cart_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cart_user -d carts"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  cart_db_data:
+    driver: local

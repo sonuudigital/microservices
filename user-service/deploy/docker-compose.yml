@@ -1,0 +1,67 @@
+services:
+  user-app:
+    image: user-service-app:latest
+    container_name: user-service-app
+    build:
+      context: ../../
+      dockerfile: user-service/deploy/Dockerfile
+    environment:
+      DATABASE_URL: postgres://user_user:user_password@user-db:5432/users?sslmode=disable
+      JWT_SECRET: mi-super-secreto-jwt-key-2025
+      JWT_ISSUER: user-service
+      JWT_AUDIENCE: user-service-clients
+      JWT_TTL_MINUTES: 60
+      MIGRATIONS_DIR: /migrations
+    ports:
+      - "8081:8081"
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - user_app_user_db_pgadmin_network
+    restart: unless-stopped
+
+  user-db:
+    image: postgres:18-alpine
+    container_name: user-service-db
+    hostname: user-db
+    environment:
+      POSTGRES_DB: users
+      POSTGRES_USER: user_user
+      POSTGRES_PASSWORD: user_password
+    ports:
+      - "5433:5432"
+    networks:
+      - user_app_user_db_pgadmin_network
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_user -d users"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:9.8.0
+    container_name: user-service-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: facuortega21@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: userdb
+    ports:
+      - "8888:80"
+    restart: unless-stopped
+    depends_on:
+      - user-db
+    networks:
+      - user_app_user_db_pgadmin_network
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  user_db_data:
+  pgadmin_data:
+
+networks:
+  user_app_user_db_pgadmin_network:
+    driver: bridge
