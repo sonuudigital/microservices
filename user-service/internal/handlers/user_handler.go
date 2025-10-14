@@ -35,6 +35,7 @@ func NewHandler(db repository.DBTX, logger logs.Logger) *Handler {
 }
 
 func (h *Handler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
+	h.logger.Debug("GetUserByIDHandler received a request")
 	ctx := r.Context()
 	if !h.checkContext(ctx) {
 		http.Error(w, reqCancelledMsg, http.StatusRequestTimeout)
@@ -61,7 +62,7 @@ func (h *Handler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
-		h.logger.Error("failed to get user by id", err)
+		h.logger.Error("failed to get user by id", "error", err)
 		http.Error(w, "failed to get user", http.StatusInternalServerError)
 		return
 	}
@@ -79,7 +80,7 @@ func (h *Handler) AuthorizeUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	var authReq AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
-		h.logger.Error("failed to decode request body", err)
+		h.logger.Error("failed to decode request body", "error", err)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -90,14 +91,14 @@ func (h *Handler) AuthorizeUserHandler(w http.ResponseWriter, r *http.Request) {
 	queries := repository.New(h.db)
 	user, err := queries.GetUserByEmail(ctx, authReq.Email)
 	if err != nil {
-		h.logger.Error("failed to get user by email", err)
+		h.logger.Error("failed to get user by email", "error", err)
 		http.Error(w, "invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
 	match, err := argon2id.ComparePasswordAndHash(authReq.Password, user.Password)
 	if err != nil || !match {
-		h.logger.Error("password mismatch", err)
+		h.logger.Warn("password mismatch", "error", err, "email", authReq.Email)
 		http.Error(w, "invalid email or password", http.StatusUnauthorized)
 		return
 	}
@@ -115,14 +116,14 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	var userReq repository.CreateUserParams
 	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
-		h.logger.Error("failed to decode request body", err)
+		h.logger.Error("failed to decode request body", "error", err)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	hashedPassword, err := argon2id.CreateHash(strings.TrimSpace(userReq.Password), argon2id.DefaultParams)
 	if err != nil {
-		h.logger.Error("failed to hash password", err)
+		h.logger.Error("failed to hash password", "error", err)
 		http.Error(w, "failed to hash password", http.StatusInternalServerError)
 		return
 	}
@@ -134,7 +135,7 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	queries := repository.New(h.db)
 	_, err = queries.CreateUser(ctx, userReq)
 	if err != nil {
-		h.logger.Error("failed to create user", err)
+		h.logger.Error("failed to create user", "error", err)
 		http.Error(w, "failed to create user", http.StatusInternalServerError)
 		return
 	}

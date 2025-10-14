@@ -1,0 +1,48 @@
+package router
+
+import (
+	"net/http"
+	"os"
+
+	"api-gateway/internal/handlers"
+	"api-gateway/internal/middlewares"
+	"shared/auth"
+	"shared/logs"
+)
+
+type authMiddleware func(http.Handler) http.Handler
+
+func New(authHandler *handlers.AuthHandler, jwtManager *auth.JWTManager, logger logs.Logger) (*http.ServeMux, error) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("gateway is healthy"))
+	})
+
+	authMw := middlewares.AuthMiddleware(jwtManager, logger)
+
+	err := configAuthAndUserRoutes(mux, authHandler, authMw, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return mux, nil
+}
+
+func configAuthAndUserRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandler, authMiddleware authMiddleware, logger logs.Logger) error {
+	userServiceURL := os.Getenv("USER_SERVICE_URL")
+	userProxy, err := handlers.NewProxyHandler(userServiceURL, logger)
+	if err != nil {
+		logger.Error("failed to create user service proxy", "error", err)
+		return err
+	}
+	protectedUserProxy := authMiddleware(userProxy)
+
+	mux.HandleFunc("POST /api/auth/login", authHandler.LoginHandler)
+	mux.Handle("POST /api/users", userProxy)
+
+	mux.Handle("GET /api/users/{id}", protectedUserProxy)
+
+	return nil
+}

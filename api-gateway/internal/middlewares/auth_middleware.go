@@ -31,7 +31,7 @@ func AuthMiddleware(jwtManager *auth.JWTManager, logger logs.Logger) func(http.H
 
 			claims, err := jwtManager.ValidateToken(tokenString)
 			if err != nil {
-				logger.Error("invalid token", "error", err)
+				logger.Warn("invalid token", "error", err)
 				http.Error(w, "invalid or expired token", http.StatusUnauthorized)
 				return
 			}

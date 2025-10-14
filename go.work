@@ -6,6 +6,7 @@ use (
 	./notification-service
 	./order-service
 	./payment-service
+	./product-service
 	./shared
 	./user-service
 )

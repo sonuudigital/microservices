@@ -2,7 +2,7 @@ package main
 
 import (
 	"api-gateway/internal/handlers"
-	"api-gateway/internal/middlewares"
+	"api-gateway/internal/router"
 	"api-gateway/internal/server"
 	"context"
 	"errors"
@@ -21,8 +21,10 @@ import (
 func main() {
 	logger := logs.NewSlogLogger()
 	err := godotenv.Load()
-	if err != nil {
-		logger.Warn("no .env file found, using environment variables")
+	if err == nil {
+		logger.Info("loaded environment variables from .env file")
+	} else {
+		logger.Info("no .env file found, using environment variables")
 	}
 
 	logger.Info("starting api-gateway")
@@ -31,7 +33,7 @@ func main() {
 
 	authHandler := handlers.NewAuthHandler(logger, jwtManager)
 
-	mux, err := configRoutes(authHandler, jwtManager, logger)
+	mux, err := router.New(authHandler, jwtManager, logger)
 	if err != nil {
 		logger.Error("failed to configure routes", "error", err)
 		os.Exit(1)
@@ -43,6 +45,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	startServerAndWaitForShutdown(srv, logger)
+}
+
+func startServerAndWaitForShutdown(srv *http.Server, logger *logs.SlogLogger) {
 	go func() {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("failed to start server", "error", err)
@@ -55,7 +61,7 @@ func main() {
 
 	shCtx, shCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shCancel()
-	if err = srv.Shutdown(shCtx); err != nil {
+	if err := srv.Shutdown(shCtx); err != nil {
 		logger.Error("failed to shutdown server", "error", err)
 	} else {
 		logger.Info("shutdown complete")
@@ -95,37 +101,4 @@ func initializeJWTManager(logger logs.Logger) *auth.JWTManager {
 		jwtAudience,
 		time.Duration(jwtExpirationMinutesInt)*time.Minute,
 	)
-}
-
-func configRoutes(authHandler *handlers.AuthHandler, jwtManager *auth.JWTManager, logger logs.Logger) (*http.ServeMux, error) {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("gateway is healthy"))
-	})
-
-	err := configAuthAndUserRoutes(mux, authHandler, middlewares.AuthMiddleware(jwtManager, logger), logger)
-	if err != nil {
-		return nil, err
-	}
-
-	return mux, nil
-}
-
-type authMiddleware func(http.Handler) http.Handler
-
-func configAuthAndUserRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandler, authMiddleware authMiddleware, logger logs.Logger) error {
-	userServiceURL := os.Getenv("USER_SERVICE_URL")
-	userProxy, err := handlers.NewProxyHandler(userServiceURL, logger)
-	if err != nil {
-		return err
-	}
-	protectedUserProxy := authMiddleware(userProxy)
-
-	mux.HandleFunc("POST /api/auth/login", authHandler.LoginHandler)
-	mux.Handle("POST /api/users", userProxy)
-	mux.Handle("GET /api/users/{id}", protectedUserProxy)
-
-	return nil
 }

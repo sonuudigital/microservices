@@ -10,6 +10,7 @@ services:
     environment:
       PORT: 8080
       USER_SERVICE_URL: http://user-service:8081
+      LOG_LEVEL: ${LOG_LEVEL}
       JWT_SECRET: ${JWT_SECRET}
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
