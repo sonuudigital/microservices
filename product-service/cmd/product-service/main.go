@@ -6,18 +6,18 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"product-service/internal/router"
+	"product-service/internal/server"
 	"shared/logs"
+	"shared/postgres"
 	"syscall"
 	"time"
-	"shared/postgres"
-	"user-service/internal/server"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	logger := logs.NewSlogLogger()
-
 	err := godotenv.Load()
 	if err == nil {
 		logger.Info("loaded environment variables from .env file")
@@ -30,16 +30,26 @@ func main() {
 		logger.Error("error connecting to database", "error", err)
 		os.Exit(1)
 	}
-
 	logger.Info("database connected successfully")
+	defer pgDb.Close()
 
-	srv := server.InitializeServer(pgDb, logger)
-	logger.Info("server initialized successfully", "port", os.Getenv("PORT"))
+	mux := router.ConfigRoutes(pgDb, logger)
 
+	port := os.Getenv("PORT")
+	srv, err := server.InitializeServer(port, mux, logger)
+	if err != nil {
+		logger.Error("failed to initialize server", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("server initialized successfully", "port", port)
+	startServerAndWaitForShutdown(srv, logger)
+}
+
+func startServerAndWaitForShutdown(srv *http.Server, logger *logs.SlogLogger) {
 	go func() {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("http server error", "err", err)
-			os.Exit(1)
+			logger.Error("failed to start server", "error", err)
 		}
 	}()
 
@@ -49,6 +59,9 @@ func main() {
 
 	shCtx, shCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shCancel()
-	_ = srv.Shutdown(shCtx)
-	logger.Info("shutdown complete")
+	if err := srv.Shutdown(shCtx); err != nil {
+		logger.Error("failed to shutdown server", "error", err)
+	} else {
+		logger.Info("shutdown complete")
+	}
 }

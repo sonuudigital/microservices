@@ -45,6 +45,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	logger.Info("server initialized successfully", "port", os.Getenv("PORT"))
 	startServerAndWaitForShutdown(srv, logger)
 }
 

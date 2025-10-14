@@ -8,6 +8,7 @@ import (
 	"os"
 	"shared/auth"
 	"shared/logs"
+	"shared/web"
 )
 
 type AuthHandler struct {
@@ -105,5 +106,5 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, LoginResponse{Token: token})
+	web.RespondWithJSON(w, h.logger, http.StatusOK, LoginResponse{Token: token})
 }

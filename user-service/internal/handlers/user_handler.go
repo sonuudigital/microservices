@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"shared/logs"
+	"shared/web"
 	"strings"
 	"user-service/internal/repository"
 
@@ -23,10 +23,6 @@ type AuthRequest struct {
 	Password string `json:"password"`
 }
 
-const (
-	reqCancelledMsg = "request cancelled"
-)
-
 func NewHandler(db repository.DBTX, logger logs.Logger) *Handler {
 	return &Handler{
 		db:     db,
@@ -37,8 +33,8 @@ func NewHandler(db repository.DBTX, logger logs.Logger) *Handler {
 func (h *Handler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debug("GetUserByIDHandler received a request")
 	ctx := r.Context()
-	if !h.checkContext(ctx) {
-		http.Error(w, reqCancelledMsg, http.StatusRequestTimeout)
+	if !web.CheckContext(ctx, h.logger) {
+		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
 		return
 	}
 
@@ -68,13 +64,13 @@ func (h *Handler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user.Password = ""
-	h.respondWithJSON(w, http.StatusOK, user)
+	web.RespondWithJSON(w, h.logger, http.StatusOK, user)
 }
 
 func (h *Handler) AuthorizeUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !h.checkContext(ctx) {
-		http.Error(w, reqCancelledMsg, http.StatusRequestTimeout)
+	if !web.CheckContext(ctx, h.logger) {
+		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
 		return
 	}
 
@@ -104,13 +100,13 @@ func (h *Handler) AuthorizeUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user.Password = ""
-	h.respondWithJSON(w, http.StatusOK, user)
+	web.RespondWithJSON(w, h.logger, http.StatusOK, user)
 }
 
 func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !h.checkContext(ctx) {
-		http.Error(w, reqCancelledMsg, http.StatusRequestTimeout)
+	if !web.CheckContext(ctx, h.logger) {
+		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
 		return
 	}
 
@@ -140,24 +136,5 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.respondWithJSON(w, http.StatusCreated, nil)
-}
-
-func (h *Handler) respondWithJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	if payload != nil {
-		if err := json.NewEncoder(w).Encode(payload); err != nil {
-			http.Error(w, "failed to encode response", http.StatusInternalServerError)
-		}
-	}
-}
-
-func (h *Handler) checkContext(ctx context.Context) bool {
-	if ctx.Err() != nil {
-		h.logger.Error(reqCancelledMsg, ctx.Err())
-		return false
-	}
-	return true
+	web.RespondWithJSON(w, h.logger, http.StatusCreated, nil)
 }

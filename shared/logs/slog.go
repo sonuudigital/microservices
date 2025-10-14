@@ -17,10 +17,12 @@ type SlogLogger struct {
 }
 
 func NewSlogLogger() *SlogLogger {
+	logLevel := configLogLevel(os.Getenv("LOG_LEVEL"))
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: configLogLevel(os.Getenv("LOG_LEVEL")),
+		Level: logLevel,
 	}))
-	logger.Info("Logger initialized", "level", os.Getenv("LOG_LEVEL"))
+
+	logger.Info("logger initialized", "level", logLevel.String())
 
 	return &SlogLogger{
 		logger: logger,

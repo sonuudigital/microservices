@@ -41,8 +41,6 @@ func InitializeServer(db *pgxpool.Pool, logger logs.Logger) *Server {
 		IdleTimeout:       serverIdleTimeout,
 	}
 
-	logger.Info("starting server", "port", port)
-
 	return newServer(srv)
 }
 
