@@ -16,8 +16,8 @@ COPY shared/ ./shared/
 COPY api-gateway/ ./api-gateway/
 
 WORKDIR /workspace/api-gateway
-RUN go mod edit -replace shared=../shared
-RUN go mod tidy
+RUN go mod edit -replace shared=../shared && go mod tidy
+
 ENV CGO_ENABLED=0
 RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} \

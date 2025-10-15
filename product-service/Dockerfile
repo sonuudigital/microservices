@@ -4,38 +4,33 @@ ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 
 WORKDIR /workspace
-
-RUN apk add --no-cache ca-certificates
-
 COPY shared/go.mod ./shared/
-COPY user-service/go.mod user-service/go.sum ./user-service/
+COPY product-service/go.mod product-service/go.sum ./product-service/
 
-WORKDIR /workspace/user-service
+WORKDIR /workspace/product-service
 RUN go mod edit -replace shared=../shared
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 WORKDIR /workspace
 COPY shared/ ./shared/
-COPY user-service/ ./user-service/
+COPY product-service/ ./product-service/
 
-WORKDIR /workspace/user-service
-RUN go mod edit -replace shared=../shared
-RUN go mod tidy
+WORKDIR /workspace/product-service
+RUN go mod edit -replace shared=../shared && go mod tidy
 
 ENV CGO_ENABLED=0
-
 RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath -buildvcs=false -ldflags="-s -w" \
-    -o /out/user-service ./cmd/user-service
+    -o /out/product-service ./cmd/product-service
 
 FROM gcr.io/distroless/static:nonroot
 
-COPY --from=builder /out/user-service /user-service
-COPY --from=builder /workspace/user-service/internal/migrations /migrations
+COPY --from=builder /out/product-service /product-service
+COPY --from=builder /workspace/product-service/internal/database/migrations /migrations
 
-ENV PORT=8081
+ENV PORT=8082
 
-EXPOSE 8081
+EXPOSE 8082
 
-CMD ["/user-service"]
+CMD ["/product-service"]

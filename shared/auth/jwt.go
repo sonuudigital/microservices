@@ -62,7 +62,7 @@ func (j *JWTManager) GenerateToken(email string) (string, error) {
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	signedToken, err := token.SignedString(j.secret)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign token: %w", err)
@@ -75,7 +75,7 @@ func (j *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 	tokenString = sanitizeBearer(tokenString)
 
 	parser := jwt.NewParser(
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
 		jwt.WithIssuer(j.issuer),
 		jwt.WithAudience(j.audience),
 		jwt.WithLeeway(j.leeway),
