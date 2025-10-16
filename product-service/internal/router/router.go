@@ -3,14 +3,13 @@ package router
 import (
 	"context"
 	"net/http"
+	"product-service/internal/db"
 	"product-service/internal/handlers"
 	"shared/logs"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func ConfigRoutes(db *pgxpool.Pool, logger logs.Logger) *http.ServeMux {
+func ConfigRoutes(db db.DB, logger logs.Logger) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +32,7 @@ func ConfigRoutes(db *pgxpool.Pool, logger logs.Logger) *http.ServeMux {
 	return mux
 }
 
-func registerProductRoutes(mux *http.ServeMux, db *pgxpool.Pool, logger logs.Logger) {
+func registerProductRoutes(mux *http.ServeMux, db db.DB, logger logs.Logger) {
 	h := handlers.NewHandler(db, logger)
 
 	mux.HandleFunc("POST /api/products", h.CreateProductHandler)

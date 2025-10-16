@@ -6,9 +6,8 @@ import (
 	"os"
 	"shared/logs"
 	"time"
+	"user-service/internal/db"
 	"user-service/internal/handlers"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Server struct {
@@ -27,7 +26,7 @@ func newServer(srv *http.Server) *Server {
 	}
 }
 
-func InitializeServer(db *pgxpool.Pool, logger logs.Logger) *Server {
+func InitializeServer(db db.DB, logger logs.Logger) *Server {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8081"
@@ -44,7 +43,7 @@ func InitializeServer(db *pgxpool.Pool, logger logs.Logger) *Server {
 	return newServer(srv)
 }
 
-func configRoutes(db *pgxpool.Pool, logger logs.Logger) *http.ServeMux {
+func configRoutes(db db.DB, logger logs.Logger) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -67,11 +66,10 @@ func configRoutes(db *pgxpool.Pool, logger logs.Logger) *http.ServeMux {
 	return mux
 }
 
-func registerUserRoutes(mux *http.ServeMux, db *pgxpool.Pool, logger logs.Logger) {
+func registerUserRoutes(mux *http.ServeMux, db db.DB, logger logs.Logger) {
 	handler := handlers.NewHandler(db, logger)
 
 	mux.HandleFunc("POST /api/users", handler.CreateUserHandler)
 	mux.HandleFunc("POST /api/auth/login", handler.AuthorizeUserHandler)
-
 	mux.HandleFunc("GET /api/users/{id}", handler.GetUserByIDHandler)
 }

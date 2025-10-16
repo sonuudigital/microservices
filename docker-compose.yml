@@ -104,6 +104,8 @@ services:
     depends_on:
       user-db:
         condition: service_healthy
+      product-db:
+        condition: service_healthy
     networks:
       - ecommerce-network
     volumes:

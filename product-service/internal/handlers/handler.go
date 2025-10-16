@@ -26,7 +26,8 @@ func NewHandler(db repository.DBTX, logger logs.Logger) *Handler {
 }
 
 const (
-	invalidIDMsg = "invalid product id"
+	invalidIDMsg       = "invalid product id"
+	productNotFoundMsg = "product not found"
 )
 
 type ProductRequest struct {
@@ -90,7 +91,7 @@ func (h *Handler) GetProductHandler(w http.ResponseWriter, r *http.Request) {
 	product, err := queries.GetProduct(ctx, uid)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			http.Error(w, "product not found", http.StatusNotFound)
+			http.Error(w, productNotFoundMsg, http.StatusNotFound)
 			return
 		}
 		h.logger.Error("failed to get product", "error", err)
@@ -170,7 +171,7 @@ func (h *Handler) UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	product, err := queries.UpdateProduct(ctx, params)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			http.Error(w, "product not found", http.StatusNotFound)
+			http.Error(w, productNotFoundMsg, http.StatusNotFound)
 			return
 		}
 		h.logger.Error("failed to update product", "error", err)
@@ -197,7 +198,20 @@ func (h *Handler) DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	queries := repository.New(h.db)
-	err := queries.DeleteProduct(ctx, uid)
+
+	_, err := queries.GetProduct(ctx, uid)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			h.logger.Debug(productNotFoundMsg, "id", uid)
+			http.Error(w, productNotFoundMsg, http.StatusNotFound)
+			return
+		}
+		h.logger.Error("failed to get product before delete", "error", err)
+		http.Error(w, "failed to get product before delete", http.StatusInternalServerError)
+		return
+	}
+
+	err = queries.DeleteProduct(ctx, uid)
 	if err != nil {
 		h.logger.Error("failed to delete product", "error", err)
 		http.Error(w, "failed to delete product", http.StatusInternalServerError)
