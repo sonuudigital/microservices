@@ -1,19 +1,20 @@
 package main
 
 import (
-	"api-gateway/internal/handlers"
-	"api-gateway/internal/router"
-	"api-gateway/internal/server"
 	"context"
 	"errors"
 	"net/http"
 	"os"
 	"os/signal"
-	"shared/auth"
-	"shared/logs"
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
+	"github.com/sonuudigital/microservices/api-gateway/internal/router"
+	"github.com/sonuudigital/microservices/api-gateway/internal/server"
+	"github.com/sonuudigital/microservices/shared/auth"
+	"github.com/sonuudigital/microservices/shared/logs"
 
 	"github.com/joho/godotenv"
 )

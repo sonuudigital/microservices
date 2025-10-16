@@ -3,10 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"shared/logs"
-	"shared/web"
 	"strings"
-	"user-service/internal/repository"
+
+	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/shared/web"
+	"github.com/sonuudigital/microservices/user-service/internal/repository"
 
 	"github.com/alexedwards/argon2id"
 	"github.com/jackc/pgx/v5"

@@ -1,7 +1,6 @@
 package handlers_test
 
 import (
-	"api-gateway/internal/handlers"
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -12,10 +11,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"shared/auth"
-	"shared/logs"
 	"testing"
 	"time"
+
+	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
+	"github.com/sonuudigital/microservices/shared/auth"
+	"github.com/sonuudigital/microservices/shared/logs"
 
 	"github.com/stretchr/testify/assert"
 )

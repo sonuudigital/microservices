@@ -6,11 +6,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"shared/logs"
 	"syscall"
 	"time"
-	"shared/postgres"
-	"user-service/internal/server"
+
+	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/shared/postgres"
+	"github.com/sonuudigital/microservices/user-service/internal/server"
 
 	"github.com/joho/godotenv"
 )

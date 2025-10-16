@@ -4,11 +4,12 @@ import (
 	"context"
 	"net/http"
 	"os"
-	"shared/logs"
 	"time"
-	"user-service/internal/db"
-	"user-service/internal/handlers"
-	"user-service/internal/repository"
+
+	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/user-service/internal/db"
+	"github.com/sonuudigital/microservices/user-service/internal/handlers"
+	"github.com/sonuudigital/microservices/user-service/internal/repository"
 )
 
 type Server struct {

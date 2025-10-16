@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"product-service/internal/router"
-	"product-service/internal/server"
-	"shared/logs"
-	"shared/postgres"
 	"syscall"
 	"time"
+
+	"github.com/sonuudigital/microservices/product-service/internal/router"
+	"github.com/sonuudigital/microservices/product-service/internal/server"
+	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/shared/postgres"
 
 	"github.com/joho/godotenv"
 )

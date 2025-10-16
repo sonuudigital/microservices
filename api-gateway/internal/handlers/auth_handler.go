@@ -6,9 +6,9 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"shared/auth"
-	"shared/logs"
-	"shared/web"
+	"github.com/sonuudigital/microservices/shared/auth"
+	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/shared/web"
 )
 
 type AuthHandler struct {

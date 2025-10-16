@@ -7,10 +7,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"product-service/internal/handlers"
-	"product-service/internal/repository"
-	"shared/logs"
 	"testing"
+
+	"github.com/sonuudigital/microservices/product-service/internal/handlers"
+	"github.com/sonuudigital/microservices/product-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/logs"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"

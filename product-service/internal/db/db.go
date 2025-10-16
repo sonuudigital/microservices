@@ -2,7 +2,8 @@ package db
 
 import (
 	"context"
-	"product-service/internal/repository"
+
+	"github.com/sonuudigital/microservices/product-service/internal/repository"
 )
 
 type DB interface {

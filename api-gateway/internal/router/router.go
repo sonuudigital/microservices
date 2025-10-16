@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"os"
 
-	"api-gateway/internal/handlers"
-	"api-gateway/internal/middlewares"
-	"shared/auth"
-	"shared/logs"
+	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
+	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
+	"github.com/sonuudigital/microservices/shared/auth"
+	"github.com/sonuudigital/microservices/shared/logs"
 )
 
 type authMiddleware func(http.Handler) http.Handler

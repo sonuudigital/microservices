@@ -8,7 +8,7 @@ COPY shared/go.mod ./shared/
 COPY user-service/go.mod user-service/go.sum ./user-service/
 
 WORKDIR /workspace/user-service
-RUN go mod edit -replace shared=../shared
+RUN go mod edit -replace github.com/sonuudigital/microservices/shared=../shared
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 WORKDIR /workspace
@@ -16,7 +16,7 @@ COPY shared/ ./shared/
 COPY user-service/ ./user-service/
 
 WORKDIR /workspace/user-service
-RUN go mod edit -replace shared=../shared && go mod tidy
+RUN go mod edit -replace github.com/sonuudigital/microservices/shared=../shared && go mod tidy
 
 ENV CGO_ENABLED=0
 RUN --mount=type=cache,target=/root/.cache/go-build \

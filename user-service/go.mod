@@ -1,4 +1,4 @@
-module user-service
+module github.com/sonuudigital/microservices/user-service
 
 go 1.25.0
 

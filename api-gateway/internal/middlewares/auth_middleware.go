@@ -3,8 +3,8 @@ package middlewares
 import (
 	"context"
 	"net/http"
-	"shared/auth"
-	"shared/logs"
+	"github.com/sonuudigital/microservices/shared/auth"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"strings"
 )
 

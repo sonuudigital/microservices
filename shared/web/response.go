@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"shared/logs"
+
+	"github.com/sonuudigital/microservices/shared/logs"
 )
 
 const (

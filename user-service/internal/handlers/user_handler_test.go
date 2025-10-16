@@ -7,10 +7,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"shared/logs"
 	"testing"
-	"user-service/internal/handlers"
-	"user-service/internal/repository"
+
+	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/user-service/internal/handlers"
+	"github.com/sonuudigital/microservices/user-service/internal/repository"
 
 	"github.com/alexedwards/argon2id"
 	"github.com/jackc/pgx/v5"

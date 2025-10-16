@@ -3,7 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
-	"shared/logs"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"time"
 )
 

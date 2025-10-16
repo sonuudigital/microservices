@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	"api-gateway/internal/middlewares"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"shared/logs"
+
+	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
+	"github.com/sonuudigital/microservices/shared/logs"
 )
 
 func NewProxyHandler(targetURL string, logger logs.Logger) (http.Handler, error) {

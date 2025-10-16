@@ -3,11 +3,12 @@ package router
 import (
 	"context"
 	"net/http"
-	"product-service/internal/db"
-	"product-service/internal/handlers"
-	"product-service/internal/repository"
-	"shared/logs"
 	"time"
+
+	"github.com/sonuudigital/microservices/product-service/internal/db"
+	"github.com/sonuudigital/microservices/product-service/internal/handlers"
+	"github.com/sonuudigital/microservices/product-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/logs"
 )
 
 func ConfigRoutes(db db.DB, logger logs.Logger) *http.ServeMux {

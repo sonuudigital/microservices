@@ -1,7 +1,6 @@
 package middlewares_test
 
 import (
-	"api-gateway/internal/middlewares"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,10 +8,12 @@ import (
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
-	"shared/auth"
-	"shared/logs"
 	"testing"
 	"time"
+
+	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
+	"github.com/sonuudigital/microservices/shared/auth"
+	"github.com/sonuudigital/microservices/shared/logs"
 
 	"github.com/stretchr/testify/assert"
 )
