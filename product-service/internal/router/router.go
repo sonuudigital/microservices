@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"product-service/internal/db"
 	"product-service/internal/handlers"
+	"product-service/internal/repository"
 	"shared/logs"
 	"time"
 )
@@ -33,7 +34,8 @@ func ConfigRoutes(db db.DB, logger logs.Logger) *http.ServeMux {
 }
 
 func registerProductRoutes(mux *http.ServeMux, db db.DB, logger logs.Logger) {
-	h := handlers.NewHandler(db, logger)
+	queries := repository.New(db)
+	h := handlers.NewHandler(queries, logger)
 
 	mux.HandleFunc("POST /api/products", h.CreateProductHandler)
 	mux.HandleFunc("GET /api/products/{id}", h.GetProductHandler)

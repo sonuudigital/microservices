@@ -14,8 +14,8 @@ import (
 )
 
 type Handler struct {
-	db     repository.DBTX
-	logger logs.Logger
+	queries repository.Querier
+	logger  logs.Logger
 }
 
 type AuthRequest struct {
@@ -23,10 +23,10 @@ type AuthRequest struct {
 	Password string `json:"password"`
 }
 
-func NewHandler(db repository.DBTX, logger logs.Logger) *Handler {
+func NewHandler(queries repository.Querier, logger logs.Logger) *Handler {
 	return &Handler{
-		db:     db,
-		logger: logger,
+		queries: queries,
+		logger:  logger,
 	}
 }
 
@@ -51,8 +51,7 @@ func (h *Handler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queries := repository.New(h.db)
-	user, err := queries.GetUserByID(ctx, uid)
+	user, err := h.queries.GetUserByID(ctx, uid)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			http.Error(w, "user not found", http.StatusNotFound)
@@ -84,8 +83,7 @@ func (h *Handler) AuthorizeUserHandler(w http.ResponseWriter, r *http.Request) {
 	authReq.Email = strings.TrimSpace(authReq.Email)
 	authReq.Password = strings.TrimSpace(authReq.Password)
 
-	queries := repository.New(h.db)
-	user, err := queries.GetUserByEmail(ctx, authReq.Email)
+	user, err := h.queries.GetUserByEmail(ctx, authReq.Email)
 	if err != nil {
 		h.logger.Error("failed to get user by email", "error", err)
 		http.Error(w, "invalid email or password", http.StatusUnauthorized)
@@ -128,8 +126,7 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	userReq.Email = strings.TrimSpace(userReq.Email)
 	userReq.Password = hashedPassword
 
-	queries := repository.New(h.db)
-	_, err = queries.CreateUser(ctx, userReq)
+	_, err = h.queries.CreateUser(ctx, userReq)
 	if err != nil {
 		h.logger.Error("failed to create user", "error", err)
 		http.Error(w, "failed to create user", http.StatusInternalServerError)

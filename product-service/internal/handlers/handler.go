@@ -14,14 +14,14 @@ import (
 )
 
 type Handler struct {
-	db     repository.DBTX
-	logger logs.Logger
+	queries repository.Querier
+	logger  logs.Logger
 }
 
-func NewHandler(db repository.DBTX, logger logs.Logger) *Handler {
+func NewHandler(queries repository.Querier, logger logs.Logger) *Handler {
 	return &Handler{
-		db:     db,
-		logger: logger,
+		queries: queries,
+		logger:  logger,
 	}
 }
 
@@ -62,8 +62,7 @@ func (h *Handler) CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queries := repository.New(h.db)
-	product, err := queries.CreateProduct(ctx, params)
+	product, err := h.queries.CreateProduct(ctx, params)
 	if err != nil {
 		h.logger.Error("failed to create product", "error", err)
 		http.Error(w, "failed to create product", http.StatusInternalServerError)
@@ -87,8 +86,7 @@ func (h *Handler) GetProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queries := repository.New(h.db)
-	product, err := queries.GetProduct(ctx, uid)
+	product, err := h.queries.GetProduct(ctx, uid)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			http.Error(w, productNotFoundMsg, http.StatusNotFound)
@@ -124,8 +122,7 @@ func (h *Handler) ListProductsHandler(w http.ResponseWriter, r *http.Request) {
 		Offset: int32(offset),
 	}
 
-	queries := repository.New(h.db)
-	products, err := queries.ListProductsPaginated(ctx, params)
+	products, err := h.queries.ListProductsPaginated(ctx, params)
 	if err != nil {
 		h.logger.Error("failed to list products", "error", err)
 		http.Error(w, "failed to list products", http.StatusInternalServerError)
@@ -167,8 +164,7 @@ func (h *Handler) UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queries := repository.New(h.db)
-	product, err := queries.UpdateProduct(ctx, params)
+	product, err := h.queries.UpdateProduct(ctx, params)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			http.Error(w, productNotFoundMsg, http.StatusNotFound)
@@ -197,9 +193,7 @@ func (h *Handler) DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queries := repository.New(h.db)
-
-	_, err := queries.GetProduct(ctx, uid)
+	_, err := h.queries.GetProduct(ctx, uid)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			h.logger.Debug(productNotFoundMsg, "id", uid)
@@ -211,7 +205,7 @@ func (h *Handler) DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = queries.DeleteProduct(ctx, uid)
+	err = h.queries.DeleteProduct(ctx, uid)
 	if err != nil {
 		h.logger.Error("failed to delete product", "error", err)
 		http.Error(w, "failed to delete product", http.StatusInternalServerError)

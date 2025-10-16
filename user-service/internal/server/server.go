@@ -8,6 +8,7 @@ import (
 	"time"
 	"user-service/internal/db"
 	"user-service/internal/handlers"
+	"user-service/internal/repository"
 )
 
 type Server struct {
@@ -67,7 +68,8 @@ func configRoutes(db db.DB, logger logs.Logger) *http.ServeMux {
 }
 
 func registerUserRoutes(mux *http.ServeMux, db db.DB, logger logs.Logger) {
-	handler := handlers.NewHandler(db, logger)
+	queries := repository.New(db)
+	handler := handlers.NewHandler(queries, logger)
 
 	mux.HandleFunc("POST /api/users", handler.CreateUserHandler)
 	mux.HandleFunc("POST /api/auth/login", handler.AuthorizeUserHandler)
