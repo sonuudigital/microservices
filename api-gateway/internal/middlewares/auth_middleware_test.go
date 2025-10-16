@@ -2,6 +2,11 @@ package middlewares_test
 
 import (
 	"api-gateway/internal/middlewares"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"shared/auth"
@@ -18,7 +23,21 @@ const (
 
 func TestAuthMiddleware(t *testing.T) {
 	logger := logs.NewSlogLogger()
-	jwtManager := auth.NewJWTManager("test-secret", "test-issuer", "test-audience", 15*time.Minute)
+
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.NoError(t, err)
+
+	privKeyBytes, err := x509.MarshalECPrivateKey(privKey)
+	assert.NoError(t, err)
+	privKeyPem := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: privKeyBytes})
+
+	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	assert.NoError(t, err)
+	pubKeyPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubKeyBytes})
+
+	jwtManager, err := auth.NewJWTManager(privKeyPem, pubKeyPem, "test-issuer", "test-audience", 15*time.Minute)
+	assert.NoError(t, err)
+
 	middleware := middlewares.AuthMiddleware(jwtManager, logger)
 
 	mockNextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +94,8 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("Expired Token", func(t *testing.T) {
-		shortLivedJwtManager := auth.NewJWTManager("test-secret", "test-issuer", "test-audience", -1*time.Minute)
+		shortLivedJwtManager, err := auth.NewJWTManager(privKeyPem, pubKeyPem, "test-issuer", "test-audience", -1*time.Minute)
+		assert.NoError(t, err)
 		token, err := shortLivedJwtManager.GenerateToken("test@example.com")
 		assert.NoError(t, err)
 

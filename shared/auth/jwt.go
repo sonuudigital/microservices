@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,12 +11,13 @@ import (
 )
 
 type JWTManager struct {
-	secret   []byte
-	issuer   string
-	audience string
-	ttl      time.Duration
-	leeway   time.Duration
-	now      func() time.Time
+	privateKey *ecdsa.PrivateKey
+	publicKey  *ecdsa.PublicKey
+	issuer     string
+	audience   string
+	ttl        time.Duration
+	leeway     time.Duration
+	now        func() time.Time
 }
 
 type Claims struct {
@@ -23,15 +25,26 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func NewJWTManager(secret, issuer, audience string, ttl time.Duration) *JWTManager {
-	return &JWTManager{
-		secret:   []byte(secret),
-		issuer:   issuer,
-		audience: audience,
-		ttl:      ttl,
-		leeway:   30 * time.Second,
-		now:      time.Now,
+func NewJWTManager(privateKeyPEM, publicKeyPEM []byte, issuer, audience string, ttl time.Duration) (*JWTManager, error) {
+	privateKey, err := jwt.ParseECPrivateKeyFromPEM(privateKeyPEM)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse private key: %w", err)
 	}
+
+	publicKey, err := jwt.ParseECPublicKeyFromPEM(publicKeyPEM)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse public key: %w", err)
+	}
+
+	return &JWTManager{
+		privateKey: privateKey,
+		publicKey:  publicKey,
+		issuer:     issuer,
+		audience:   audience,
+		ttl:        ttl,
+		leeway:     30 * time.Second,
+		now:        time.Now,
+	}, nil
 }
 
 func (j *JWTManager) WithLeeway(d time.Duration) *JWTManager {
@@ -62,8 +75,8 @@ func (j *JWTManager) GenerateToken(email string) (string, error) {
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString(j.secret)
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	signedToken, err := token.SignedString(j.privateKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
@@ -75,7 +88,7 @@ func (j *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 	tokenString = sanitizeBearer(tokenString)
 
 	parser := jwt.NewParser(
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithValidMethods([]string{jwt.SigningMethodES256.Alg()}),
 		jwt.WithIssuer(j.issuer),
 		jwt.WithAudience(j.audience),
 		jwt.WithLeeway(j.leeway),
@@ -83,7 +96,10 @@ func (j *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 	)
 
 	token, err := parser.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (any, error) {
-		return j.secret, nil
+		if _, ok := t.Method.(*jwt.SigningMethodECDSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return j.publicKey, nil
 	})
 	if err != nil {
 		return nil, classifyJWTError(err)

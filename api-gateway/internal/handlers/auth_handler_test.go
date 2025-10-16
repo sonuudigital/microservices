@@ -3,7 +3,12 @@ package handlers_test
 import (
 	"api-gateway/internal/handlers"
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -23,7 +28,19 @@ const (
 func TestLoginHandler(t *testing.T) {
 	logger := logs.NewSlogLogger()
 
-	jwtManager := auth.NewJWTManager("test-secret", "test-issuer", "test-audience", 15*time.Minute)
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.NoError(t, err)
+
+	privKeyBytes, err := x509.MarshalECPrivateKey(privKey)
+	assert.NoError(t, err)
+	privKeyPem := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: privKeyBytes})
+
+	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	assert.NoError(t, err)
+	pubKeyPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubKeyBytes})
+
+	jwtManager, err := auth.NewJWTManager(privKeyPem, pubKeyPem, "test-issuer", "test-audience", 15*time.Minute)
+	assert.NoError(t, err)
 
 	t.Run("Successful Login", func(t *testing.T) {
 		mockUserService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

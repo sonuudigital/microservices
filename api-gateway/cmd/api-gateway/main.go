@@ -70,11 +70,28 @@ func startServerAndWaitForShutdown(srv *http.Server, logger *logs.SlogLogger) {
 }
 
 func initializeJWTManager(logger logs.Logger) *auth.JWTManager {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		logger.Error("jwt secret not found in environment variables")
+	jwtPrivateKeyPath := os.Getenv("JWT_PRIVATE_KEY_PATH")
+	if jwtPrivateKeyPath == "" {
+		logger.Error("jwt private key path not found in environment variables")
 		os.Exit(1)
 	}
+	privateKey, err := os.ReadFile(jwtPrivateKeyPath)
+	if err != nil {
+		logger.Error("failed to read private key", "path", jwtPrivateKeyPath, "error", err)
+		os.Exit(1)
+	}
+
+	jwtPublicKeyPath := os.Getenv("JWT_PUBLIC_KEY_PATH")
+	if jwtPublicKeyPath == "" {
+		logger.Error("jwt public key path not found in environment variables")
+		os.Exit(1)
+	}
+	publicKey, err := os.ReadFile(jwtPublicKeyPath)
+	if err != nil {
+		logger.Error("failed to read public key", "path", jwtPublicKeyPath, "error", err)
+		os.Exit(1)
+	}
+
 	jwtIssuer := os.Getenv("JWT_ISSUER")
 	if jwtIssuer == "" {
 		logger.Error("jwt issuer not found in environment variables")
@@ -96,10 +113,17 @@ func initializeJWTManager(logger logs.Logger) *auth.JWTManager {
 		os.Exit(1)
 	}
 
-	return auth.NewJWTManager(
-		jwtSecret,
+	jwtManager, err := auth.NewJWTManager(
+		privateKey,
+		publicKey,
 		jwtIssuer,
 		jwtAudience,
 		time.Duration(jwtExpirationMinutesInt)*time.Minute,
 	)
+	if err != nil {
+		logger.Error("failed to create jwt manager", "error", err)
+		os.Exit(1)
+	}
+
+	return jwtManager
 }
