@@ -1,4 +1,4 @@
-# Go Microservices E-commerce Platform (GEMINI)
+# Go Microservices E-commerce Platform
 
 This project is a Go-based microservices application for an e-commerce platform, created for educational purposes. It utilizes a Go workspace to manage multiple services, which are containerized using Docker and orchestrated with `docker-compose`.
 
