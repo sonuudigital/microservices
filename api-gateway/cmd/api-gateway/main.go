@@ -12,9 +12,9 @@ import (
 
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/api-gateway/internal/router"
-	"github.com/sonuudigital/microservices/api-gateway/internal/server"
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/shared/web"
 
 	"github.com/joho/godotenv"
 )
@@ -41,7 +41,7 @@ func main() {
 	}
 	logger.Info("routes configured successfully")
 
-	srv, err := server.InitializeServer(os.Getenv("PORT"), mux, logger)
+	srv, err := web.InitializeServer(os.Getenv("PORT"), mux, logger)
 	if err != nil {
 		logger.Error("failed to initialize server", "error", err)
 		os.Exit(1)

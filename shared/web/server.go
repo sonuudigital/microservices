@@ -1,10 +1,11 @@
-package server
+package web
 
 import (
 	"errors"
 	"net/http"
-	"github.com/sonuudigital/microservices/shared/logs"
 	"time"
+
+	"github.com/sonuudigital/microservices/shared/logs"
 )
 
 const (
