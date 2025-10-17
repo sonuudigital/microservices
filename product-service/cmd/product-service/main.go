@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/sonuudigital/microservices/product-service/internal/router"
-	"github.com/sonuudigital/microservices/product-service/internal/server"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
+	"github.com/sonuudigital/microservices/shared/web"
 
 	"github.com/joho/godotenv"
 )
@@ -37,7 +37,7 @@ func main() {
 	mux := router.ConfigRoutes(pgDb, logger)
 
 	port := os.Getenv("PORT")
-	srv, err := server.InitializeServer(port, mux, logger)
+	srv, err := web.InitializeServer(port, mux, logger)
 	if err != nil {
 		logger.Error("failed to initialize server", "error", err)
 		os.Exit(1)
