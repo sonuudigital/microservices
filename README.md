@@ -40,7 +40,27 @@ For production environments, a `docker-compose.prod.yml` is available.
 
 ## Testing
 
-A comprehensive testing strategy is not yet defined. Adding unit and integration tests for each service is a future goal for this project.
+The project includes both unit and integration tests to ensure the reliability of the services.
+
+*   **Unit Tests:** Located within each service's directory (e.g., `api-gateway`, `user-service`), these tests verify individual components in isolation. They can be run using the standard `go test` command within each service's folder. For example:
+    ```bash
+    cd api-gateway
+    go test ./...
+    ```
+
+*   **Integration Tests:** Found in the `/tests` directory, these tests validate the interactions between the microservices. They are designed to be run against a live environment managed by `docker-compose`.
+
+**To run the integration tests:**
+
+1.  Ensure the services are running:
+    ```bash
+    docker-compose up --build
+    ```
+2.  Execute the tests from the `tests` directory:
+    ```bash
+    cd tests
+    API_GATEWAY_URL=http://localhost:8080 go test -v ./integration
+    ```
 
 ## License
 
