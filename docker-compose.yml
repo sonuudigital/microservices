@@ -13,6 +13,7 @@ services:
     environment:
       PORT: ${API_GATEWAY_PORT}
       USER_SERVICE_URL: http://user-service:8081
+      PRODUCT_SERVICE_URL: http://product-service:8082
       LOG_LEVEL: ${LOG_LEVEL}
       JWT_PRIVATE_KEY_PATH: /certs/private.pem
       JWT_PUBLIC_KEY_PATH: /certs/public.pem

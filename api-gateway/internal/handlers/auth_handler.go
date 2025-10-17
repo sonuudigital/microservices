@@ -28,7 +28,8 @@ type UserResponse struct {
 }
 
 type LoginResponse struct {
-	Token string `json:"token"`
+	User  UserResponse `json:"user"`
+	Token string       `json:"token"`
 }
 
 const (
@@ -80,21 +81,21 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			h.logger.Error("failed to read error response from user-service", "error", err)
-			http.Error(w, internalServerErrorMsg, http.StatusInternalServerError)
-			return
-		}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		h.logger.Error("failed to read response from user-service", "error", err)
+		http.Error(w, internalServerErrorMsg, http.StatusInternalServerError)
+		return
+	}
 
+	if resp.StatusCode != http.StatusOK {
 		http.Error(w, string(body), resp.StatusCode)
 		return
 	}
 
 	var user UserResponse
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-		h.logger.Error("failed to decode user response", "error", err)
+	if err := json.Unmarshal(body, &user); err != nil {
+		h.logger.Error("failed to decode user response", "error", err, "body", string(body))
 		http.Error(w, "failed to decode user response", http.StatusInternalServerError)
 		return
 	}
@@ -106,5 +107,9 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	web.RespondWithJSON(w, h.logger, http.StatusOK, LoginResponse{Token: token})
+	response := LoginResponse{
+		User:  user,
+		Token: token,
+	}
+	web.RespondWithJSON(w, h.logger, http.StatusOK, response)
 }
