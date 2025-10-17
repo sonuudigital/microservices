@@ -27,6 +27,11 @@ func New(authHandler *handlers.AuthHandler, jwtManager *auth.JWTManager, logger 
 		return nil, err
 	}
 
+	err = configProductRoutes(mux, authMw, logger)
+	if err != nil {
+		return nil, err
+	}
+
 	return mux, nil
 }
 
@@ -39,10 +44,27 @@ func configAuthAndUserRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandl
 	}
 	protectedUserProxy := authMiddleware(userProxy)
 
-	mux.HandleFunc("POST /api/auth/login", authHandler.LoginHandler)
-	mux.Handle("POST /api/users", userProxy)
-
 	mux.Handle("GET /api/users/{id}", protectedUserProxy)
+	mux.Handle("POST /api/users", userProxy)
+	mux.HandleFunc("POST /api/auth/login", authHandler.LoginHandler)
+
+	return nil
+}
+
+func configProductRoutes(mux *http.ServeMux, authMiddleware authMiddleware, logger logs.Logger) error {
+	productServiceURL := os.Getenv("PRODUCT_SERVICE_URL")
+	productProxy, err := handlers.NewProxyHandler(productServiceURL, logger)
+	if err != nil {
+		logger.Error("failed to create product service proxy", "error", err)
+		return err
+	}
+	protectedProductProxy := authMiddleware(productProxy)
+
+	mux.Handle("GET /api/products/{id}", productProxy)
+	mux.Handle("GET /api/products", productProxy)
+	mux.Handle("POST /api/products", protectedProductProxy)
+	mux.Handle("PUT /api/products/{id}", protectedProductProxy)
+	mux.Handle("DELETE /api/products/{id}", protectedProductProxy)
 
 	return nil
 }

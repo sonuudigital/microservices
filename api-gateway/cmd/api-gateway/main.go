@@ -39,6 +39,7 @@ func main() {
 		logger.Error("failed to configure routes", "error", err)
 		os.Exit(1)
 	}
+	logger.Info("routes configured successfully")
 
 	srv, err := server.InitializeServer(os.Getenv("PORT"), mux, logger)
 	if err != nil {
