@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS carts_products;
+DROP TABLE IF EXISTS carts;
+DROP EXTENSION IF EXISTS "uuid-ossp";
