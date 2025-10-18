@@ -1,13 +1,7 @@
 package main
 
 import (
-	"context"
-	"errors"
-	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/sonuudigital/microservices/product-service/internal/router"
 	"github.com/sonuudigital/microservices/shared/logs"
@@ -44,25 +38,5 @@ func main() {
 	}
 
 	logger.Info("server initialized successfully", "port", port)
-	startServerAndWaitForShutdown(srv, logger)
-}
-
-func startServerAndWaitForShutdown(srv *http.Server, logger *logs.SlogLogger) {
-	go func() {
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("failed to start server", "error", err)
-		}
-	}()
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
-
-	shCtx, shCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shCancel()
-	if err := srv.Shutdown(shCtx); err != nil {
-		logger.Error("failed to shutdown server", "error", err)
-	} else {
-		logger.Info("shutdown complete")
-	}
+	web.StartServerAndWaitForShutdown(srv, logger)
 }
