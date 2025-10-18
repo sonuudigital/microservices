@@ -14,7 +14,7 @@ type Product struct {
 	Description   pgtype.Text        `json:"description"`
 	Code          string             `json:"code"`
 	Price         pgtype.Numeric     `json:"price"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	StockQuantity int32              `json:"stock_quantity"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	CreatedAt     pgtype.Timestamptz `json:"createdAt"`
+	StockQuantity int32              `json:"stockQuantity"`
+	UpdatedAt     pgtype.Timestamptz `json:"updatedAt"`
 }

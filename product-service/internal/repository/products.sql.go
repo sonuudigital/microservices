@@ -29,7 +29,7 @@ type CreateProductParams struct {
 	Description   pgtype.Text    `json:"description"`
 	Price         pgtype.Numeric `json:"price"`
 	Code          string         `json:"code"`
-	StockQuantity int32          `json:"stock_quantity"`
+	StockQuantity int32          `json:"stockQuantity"`
 }
 
 func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error) {
@@ -145,7 +145,7 @@ type UpdateProductParams struct {
 	Description   pgtype.Text    `json:"description"`
 	Price         pgtype.Numeric `json:"price"`
 	Code          string         `json:"code"`
-	StockQuantity int32          `json:"stock_quantity"`
+	StockQuantity int32          `json:"stockQuantity"`
 }
 
 func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error) {

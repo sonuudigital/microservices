@@ -10,15 +10,15 @@ import (
 
 type Cart struct {
 	ID        pgtype.UUID        `json:"id"`
-	UserID    pgtype.UUID        `json:"user_id"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UserID    pgtype.UUID        `json:"userId"`
+	CreatedAt pgtype.Timestamptz `json:"createdAt"`
 }
 
 type CartsProduct struct {
 	ID        pgtype.UUID        `json:"id"`
-	CartID    pgtype.UUID        `json:"cart_id"`
-	ProductID pgtype.UUID        `json:"product_id"`
+	CartID    pgtype.UUID        `json:"cartId"`
+	ProductID pgtype.UUID        `json:"productId"`
 	Quantity  int32              `json:"quantity"`
 	Price     pgtype.Numeric     `json:"price"`
-	AddedAt   pgtype.Timestamptz `json:"added_at"`
+	AddedAt   pgtype.Timestamptz `json:"addedAt"`
 }
