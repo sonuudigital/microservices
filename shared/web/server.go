@@ -1,8 +1,12 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/sonuudigital/microservices/shared/logs"
@@ -28,4 +32,24 @@ func InitializeServer(port string, handler http.Handler, logger logs.Logger) (*h
 	}
 
 	return srv, nil
+}
+
+func StartServerAndWaitForShutdown(srv *http.Server, logger *logs.SlogLogger) {
+	go func() {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("failed to start server", "error", err)
+		}
+	}()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	<-sig
+
+	shCtx, shCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shCancel()
+	if err := srv.Shutdown(shCtx); err != nil {
+		logger.Error("failed to shutdown server", "error", err)
+	} else {
+		logger.Info("shutdown complete")
+	}
 }

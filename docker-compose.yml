@@ -12,8 +12,8 @@ services:
     user: "${UID}:${GID}"
     environment:
       PORT: ${API_GATEWAY_PORT}
-      USER_SERVICE_URL: http://user-service:8081
-      PRODUCT_SERVICE_URL: http://product-service:8082
+      USER_SERVICE_URL: ${USER_SERVICE_URL}
+      PRODUCT_SERVICE_URL: ${PRODUCT_SERVICE_URL}
       LOG_LEVEL: ${LOG_LEVEL}
       JWT_PRIVATE_KEY_PATH: /certs/private.pem
       JWT_PUBLIC_KEY_PATH: /certs/public.pem
@@ -53,6 +53,22 @@ services:
       MIGRATIONS_DIR: /migrations
     depends_on:
       product-db:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+
+  cart-service:
+    container_name: cart-service
+    hostname: cart-service
+    build:
+      context: .
+      dockerfile: cart-service/Dockerfile
+    environment:
+      PORT: ${CART_SERVICE_PORT}
+      DATABASE_URL: postgres://${CART_POSTGRES_USER}:${CART_POSTGRES_PASSWORD}@cart-db:5432/${CART_POSTGRES_DB}?sslmode=disable
+      MIGRATIONS_DIR: /migrations
+    depends_on:
+      cart-db:
         condition: service_healthy
     networks:
       - ecommerce-network
@@ -97,6 +113,26 @@ services:
       timeout: 3s
       retries: 10
 
+  cart-db:
+    image: postgres:18-alpine
+    container_name: cart-db
+    hostname: cart-db
+    environment:
+      POSTGRES_DB: ${CART_POSTGRES_DB}
+      POSTGRES_USER: ${CART_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${CART_POSTGRES_PASSWORD}
+    ports:
+      - "${CART_DATABASE_PORT}:5432"
+    volumes:
+      - cart_db_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CART_POSTGRES_USER} -d ${CART_POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   pgadmin:
     image: dpage/pgadmin4:9.8.0
     hostname: pgadmin
@@ -123,4 +159,5 @@ networks:
 volumes:
   user_db_data:
   product_db_data:
+  cart_db_data:
   pgadmin_data:

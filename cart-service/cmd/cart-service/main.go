@@ -3,17 +3,16 @@ package main
 import (
 	"os"
 
+	"github.com/sonuudigital/microservices/cart-service/internal/router"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/web"
-	"github.com/sonuudigital/microservices/user-service/internal/router"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	logger := logs.NewSlogLogger()
-
 	err := godotenv.Load()
 	if err == nil {
 		logger.Info("loaded environment variables from .env file")
