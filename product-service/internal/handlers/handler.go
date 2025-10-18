@@ -42,7 +42,7 @@ type ProductRequest struct {
 	Description   string  `json:"description"`
 	Price         float64 `json:"price"`
 	Code          string  `json:"code"`
-	StockQuantity int32   `json:"stock_quantity"`
+	StockQuantity int32   `json:"stockQuantity"`
 }
 
 func (h *Handler) CreateProductHandler(w http.ResponseWriter, r *http.Request) {
