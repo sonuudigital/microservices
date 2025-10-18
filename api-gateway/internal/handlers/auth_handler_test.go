@@ -17,6 +17,7 @@ import (
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/shared/web"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -73,8 +74,13 @@ func TestLoginHandler(t *testing.T) {
 
 	t.Run("Unauthorized from user-service", func(t *testing.T) {
 		mockUserService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/problem+json")
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("invalid credentials"))
+			json.NewEncoder(w).Encode(web.ProblemDetail{
+				Title:  "Unauthorized",
+				Status: http.StatusUnauthorized,
+				Detail: "invalid credentials",
+			})
 		}))
 		defer mockUserService.Close()
 		os.Setenv("USER_SERVICE_URL", mockUserService.URL)
@@ -89,7 +95,11 @@ func TestLoginHandler(t *testing.T) {
 		authHandler.LoginHandler(rr, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Equal(t, "invalid credentials\n", rr.Body.String())
+
+		var problem web.ProblemDetail
+		err := json.NewDecoder(rr.Body).Decode(&problem)
+		assert.NoError(t, err)
+		assert.Equal(t, "invalid credentials", problem.Detail)
 	})
 
 	t.Run("user-service is down", func(t *testing.T) {
