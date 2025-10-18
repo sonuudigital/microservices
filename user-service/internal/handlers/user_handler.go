@@ -14,6 +14,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const (
+	requestTimeoutMsg      = "Request Timeout"
+	internalServerErrorMsg = "Internal Server Error"
+)
+
 type Handler struct {
 	queries repository.Querier
 	logger  logs.Logger
@@ -35,31 +40,31 @@ func (h *Handler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debug("GetUserByIDHandler received a request")
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
-		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutMsg, web.ReqCancelledMsg)
 		return
 	}
 
 	id := strings.TrimSpace(r.PathValue("id"))
 	if id == "" {
-		http.Error(w, "missing user id", http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid User ID", "missing user id")
 		return
 	}
 
 	var uid pgtype.UUID
 	err := uid.Scan(id)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid User ID", "invalid user id")
 		return
 	}
 
 	user, err := h.queries.GetUserByID(ctx, uid)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			http.Error(w, "user not found", http.StatusNotFound)
+			web.RespondWithError(w, h.logger, r, http.StatusNotFound, "User Not Found", "user not found")
 			return
 		}
 		h.logger.Error("failed to get user by id", "error", err)
-		http.Error(w, "failed to get user", http.StatusInternalServerError)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorMsg, "failed to get user")
 		return
 	}
 
@@ -70,14 +75,14 @@ func (h *Handler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AuthorizeUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
-		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutMsg, web.ReqCancelledMsg)
 		return
 	}
 
 	var authReq AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
 		h.logger.Error("failed to decode request body", "error", err)
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Request Body", err.Error())
 		return
 	}
 
@@ -87,14 +92,14 @@ func (h *Handler) AuthorizeUserHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := h.queries.GetUserByEmail(ctx, authReq.Email)
 	if err != nil {
 		h.logger.Error("failed to get user by email", "error", err)
-		http.Error(w, "invalid email or password", http.StatusUnauthorized)
+		web.RespondWithError(w, h.logger, r, http.StatusUnauthorized, "Authorization Failed", "invalid email or password")
 		return
 	}
 
 	match, err := argon2id.ComparePasswordAndHash(authReq.Password, user.Password)
 	if err != nil || !match {
 		h.logger.Warn("password mismatch", "error", err, "email", authReq.Email)
-		http.Error(w, "invalid email or password", http.StatusUnauthorized)
+		web.RespondWithError(w, h.logger, r, http.StatusUnauthorized, "Authorization Failed", "invalid email or password")
 		return
 	}
 
@@ -105,21 +110,21 @@ func (h *Handler) AuthorizeUserHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
-		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutMsg, web.ReqCancelledMsg)
 		return
 	}
 
 	var userReq repository.CreateUserParams
 	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
 		h.logger.Error("failed to decode request body", "error", err)
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Request Body", err.Error())
 		return
 	}
 
 	hashedPassword, err := argon2id.CreateHash(strings.TrimSpace(userReq.Password), argon2id.DefaultParams)
 	if err != nil {
 		h.logger.Error("failed to hash password", "error", err)
-		http.Error(w, "failed to hash password", http.StatusInternalServerError)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorMsg, "failed to hash password")
 		return
 	}
 
@@ -130,7 +135,7 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	_, err = h.queries.CreateUser(ctx, userReq)
 	if err != nil {
 		h.logger.Error("failed to create user", "error", err)
-		http.Error(w, "failed to create user", http.StatusInternalServerError)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorMsg, "failed to create user")
 		return
 	}
 

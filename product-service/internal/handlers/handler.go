@@ -14,6 +14,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const (
+	invalidProductIDTitleMsg = "Invalid Product ID"
+	invalidProductIDBodyMsg  = "invalid product id"
+
+	productNotFoundTitleMsg = "Product Not Found"
+	productNotFoundBodyMsg  = "product not found"
+
+	requestTimeoutTitleMsg      = "Request Timeout"
+	internalServerErrorTitleMsg = "Internal Server Error"
+)
+
 type Handler struct {
 	queries repository.Querier
 	logger  logs.Logger
@@ -26,11 +37,6 @@ func NewHandler(queries repository.Querier, logger logs.Logger) *Handler {
 	}
 }
 
-const (
-	invalidIDMsg       = "invalid product id"
-	productNotFoundMsg = "product not found"
-)
-
 type ProductRequest struct {
 	Name          string  `json:"name"`
 	Description   string  `json:"description"`
@@ -42,13 +48,13 @@ type ProductRequest struct {
 func (h *Handler) CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
-		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
 		return
 	}
 
 	var req ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Request Body", err.Error())
 		return
 	}
 
@@ -59,14 +65,14 @@ func (h *Handler) CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 		StockQuantity: req.StockQuantity,
 	}
 	if err := params.Price.Scan(fmt.Sprintf("%f", req.Price)); err != nil {
-		http.Error(w, "invalid price", http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Price", err.Error())
 		return
 	}
 
 	product, err := h.queries.CreateProduct(ctx, params)
 	if err != nil {
 		h.logger.Error("failed to create product", "error", err)
-		http.Error(w, "failed to create product", http.StatusInternalServerError)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to create product.")
 		return
 	}
 
@@ -76,25 +82,25 @@ func (h *Handler) CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetProductHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
-		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
 		return
 	}
 
 	id := r.PathValue("id")
 	var uid pgtype.UUID
 	if err := uid.Scan(id); err != nil {
-		http.Error(w, invalidIDMsg, http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidProductIDTitleMsg, invalidProductIDBodyMsg)
 		return
 	}
 
 	product, err := h.queries.GetProduct(ctx, uid)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			http.Error(w, productNotFoundMsg, http.StatusNotFound)
+			web.RespondWithError(w, h.logger, r, http.StatusNotFound, productNotFoundTitleMsg, productNotFoundBodyMsg)
 			return
 		}
 		h.logger.Error("failed to get product", "error", err)
-		http.Error(w, "failed to get product", http.StatusInternalServerError)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to get product.")
 		return
 	}
 
@@ -104,7 +110,7 @@ func (h *Handler) GetProductHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListProductsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
-		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
 		return
 	}
 
@@ -126,7 +132,7 @@ func (h *Handler) ListProductsHandler(w http.ResponseWriter, r *http.Request) {
 	products, err := h.queries.ListProductsPaginated(ctx, params)
 	if err != nil {
 		h.logger.Error("failed to list products", "error", err)
-		http.Error(w, "failed to list products", http.StatusInternalServerError)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to list products.")
 		return
 	}
 
@@ -136,20 +142,20 @@ func (h *Handler) ListProductsHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
-		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
 		return
 	}
 
 	id := r.PathValue("id")
 	var uid pgtype.UUID
 	if err := uid.Scan(id); err != nil {
-		http.Error(w, invalidIDMsg, http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidProductIDTitleMsg, invalidProductIDBodyMsg)
 		return
 	}
 
 	var req ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Request Body", err.Error())
 		return
 	}
 
@@ -161,18 +167,18 @@ func (h *Handler) UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		StockQuantity: req.StockQuantity,
 	}
 	if err := params.Price.Scan(fmt.Sprintf("%f", req.Price)); err != nil {
-		http.Error(w, "invalid price", http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Price", err.Error())
 		return
 	}
 
 	product, err := h.queries.UpdateProduct(ctx, params)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			http.Error(w, productNotFoundMsg, http.StatusNotFound)
+			web.RespondWithError(w, h.logger, r, http.StatusNotFound, productNotFoundTitleMsg, productNotFoundBodyMsg)
 			return
 		}
 		h.logger.Error("failed to update product", "error", err)
-		http.Error(w, "failed to update product", http.StatusInternalServerError)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to update product.")
 		return
 	}
 
@@ -182,7 +188,7 @@ func (h *Handler) UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
-		http.Error(w, web.ReqCancelledMsg, http.StatusRequestTimeout)
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
 		return
 	}
 
@@ -190,26 +196,26 @@ func (h *Handler) DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	var uid pgtype.UUID
 	if err := uid.Scan(id); err != nil {
 		h.logger.Warn("failed to scan product id", "error", err)
-		http.Error(w, invalidIDMsg, http.StatusBadRequest)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidProductIDTitleMsg, invalidProductIDBodyMsg)
 		return
 	}
 
 	_, err := h.queries.GetProduct(ctx, uid)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			h.logger.Debug(productNotFoundMsg, "id", uid)
-			http.Error(w, productNotFoundMsg, http.StatusNotFound)
+			h.logger.Debug(productNotFoundBodyMsg, "id", uid)
+			web.RespondWithError(w, h.logger, r, http.StatusNotFound, productNotFoundTitleMsg, productNotFoundBodyMsg)
 			return
 		}
 		h.logger.Error("failed to get product before delete", "error", err)
-		http.Error(w, "failed to get product before delete", http.StatusInternalServerError)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to get product before delete.")
 		return
 	}
 
 	err = h.queries.DeleteProduct(ctx, uid)
 	if err != nil {
 		h.logger.Error("failed to delete product", "error", err)
-		http.Error(w, "failed to delete product", http.StatusInternalServerError)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to delete product.")
 		return
 	}
 
