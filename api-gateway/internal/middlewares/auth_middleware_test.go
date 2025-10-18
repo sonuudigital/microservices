@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/shared/web"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -69,7 +71,10 @@ func TestAuthMiddleware(t *testing.T) {
 		handlerToTest.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Equal(t, "missing authorization header\n", rr.Body.String())
+		var problem web.ProblemDetail
+		err := json.NewDecoder(rr.Body).Decode(&problem)
+		assert.NoError(t, err)
+		assert.Equal(t, "Missing authorization header.", problem.Detail)
 	})
 
 	t.Run("Invalid Token", func(t *testing.T) {
@@ -80,7 +85,10 @@ func TestAuthMiddleware(t *testing.T) {
 		handlerToTest.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Equal(t, "invalid or expired token\n", rr.Body.String())
+		var problem web.ProblemDetail
+		err := json.NewDecoder(rr.Body).Decode(&problem)
+		assert.NoError(t, err)
+		assert.Equal(t, "Invalid or expired token.", problem.Detail)
 	})
 
 	t.Run("Malformed Header", func(t *testing.T) {
@@ -91,7 +99,10 @@ func TestAuthMiddleware(t *testing.T) {
 		handlerToTest.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Equal(t, "invalid authorization header format\n", rr.Body.String())
+		var problem web.ProblemDetail
+		err := json.NewDecoder(rr.Body).Decode(&problem)
+		assert.NoError(t, err)
+		assert.Equal(t, "Invalid authorization header format.", problem.Detail)
 	})
 
 	t.Run("Expired Token", func(t *testing.T) {
@@ -107,6 +118,9 @@ func TestAuthMiddleware(t *testing.T) {
 		handlerToTest.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Equal(t, "invalid or expired token\n", rr.Body.String())
+		var problem web.ProblemDetail
+		err = json.NewDecoder(rr.Body).Decode(&problem)
+		assert.NoError(t, err)
+		assert.Equal(t, "Invalid or expired token.", problem.Detail)
 	})
 }
