@@ -3,9 +3,11 @@ package middlewares
 import (
 	"context"
 	"net/http"
+	"strings"
+
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
-	"strings"
+	"github.com/sonuudigital/microservices/shared/web"
 )
 
 type contextKey string
@@ -17,13 +19,13 @@ func AuthMiddleware(jwtManager *auth.JWTManager, logger logs.Logger) func(http.H
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				http.Error(w, "missing authorization header", http.StatusUnauthorized)
+				web.RespondWithError(w, logger, r, http.StatusUnauthorized, "Unauthorized", "Missing authorization header.")
 				return
 			}
 
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-				http.Error(w, "invalid authorization header format", http.StatusUnauthorized)
+				web.RespondWithError(w, logger, r, http.StatusUnauthorized, "Unauthorized", "Invalid authorization header format.")
 				return
 			}
 
@@ -32,7 +34,7 @@ func AuthMiddleware(jwtManager *auth.JWTManager, logger logs.Logger) func(http.H
 			claims, err := jwtManager.ValidateToken(tokenString)
 			if err != nil {
 				logger.Warn("invalid token", "error", err)
-				http.Error(w, "invalid or expired token", http.StatusUnauthorized)
+				web.RespondWithError(w, logger, r, http.StatusUnauthorized, "Unauthorized", "Invalid or expired token.")
 				return
 			}
 
