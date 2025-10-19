@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM gcr.io/distroless/static:nonroot
 
 COPY --from=builder /out/cart-service /cart-service
-COPY --from=builder /workspace/cart-service/internal/database/migrations /migrations
+COPY --from=builder /workspace/cart-service/internal/db/migrations /migrations
 
 ENV PORT=8083
 

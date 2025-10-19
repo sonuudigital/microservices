@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/sonuudigital/microservices/cart-service/internal/clients"
 	"github.com/sonuudigital/microservices/cart-service/internal/router"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
@@ -28,7 +29,13 @@ func main() {
 	logger.Info("database connected successfully")
 	defer pgDb.Close()
 
-	mux := router.ConfigRoutes(pgDb, logger)
+	userServiceURL := os.Getenv("USER_SERVICE_URL")
+	if userServiceURL == "" {
+		logger.Error("USER_SERVICE_URL is not set")
+		os.Exit(1)
+	}
+	userClient := clients.NewUserClient(userServiceURL, logger)
+	mux := router.ConfigRoutes(pgDb, userClient, logger)
 
 	port := os.Getenv("PORT")
 	srv, err := web.InitializeServer(port, mux, logger)

@@ -9,7 +9,7 @@ import (
 	"github.com/sonuudigital/microservices/shared/logs"
 )
 
-func ConfigRoutes(db db.DB, logger logs.Logger) *http.ServeMux {
+func ConfigRoutes(db db.DB, userClient handlers.UserValidator, logger logs.Logger) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -25,14 +25,14 @@ func ConfigRoutes(db db.DB, logger logs.Logger) *http.ServeMux {
 		_, _ = w.Write([]byte("ready"))
 	})
 
-	registerCartRoutes(mux, db, logger)
+	registerCartRoutes(mux, db, userClient, logger)
 
 	return mux
 }
 
-func registerCartRoutes(mux *http.ServeMux, db db.DB, logger logs.Logger) {
+func registerCartRoutes(mux *http.ServeMux, db db.DB, userClient handlers.UserValidator, logger logs.Logger) {
 	queries := repository.New(db)
-	h := handlers.NewHandler(queries, logger)
+	h := handlers.NewHandler(queries, userClient, logger)
 
 	mux.HandleFunc("GET /api/carts/{id}", h.GetCartByUserIDHandler)
 	mux.HandleFunc("POST /api/carts", h.CreateCartHandler)

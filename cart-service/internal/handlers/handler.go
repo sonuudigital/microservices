@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -22,9 +23,14 @@ const (
 	internalServerErrorTitleMsg = "Internal Server Error"
 )
 
+type UserValidator interface {
+	ValidateUserExists(ctx context.Context, userID string) (bool, error)
+}
+
 type Handler struct {
-	queries repository.Querier
-	logger  logs.Logger
+	queries       repository.Querier
+	userValidator UserValidator
+	logger        logs.Logger
 }
 
 type CartRequest struct {
@@ -43,10 +49,11 @@ func newCartResponse(cart repository.Cart) CartResponse {
 	}
 }
 
-func NewHandler(queries repository.Querier, logger logs.Logger) *Handler {
+func NewHandler(queries repository.Querier, userValidator UserValidator, logger logs.Logger) *Handler {
 	return &Handler{
-		queries: queries,
-		logger:  logger,
+		queries:       queries,
+		userValidator: userValidator,
+		logger:        logger,
 	}
 }
 
@@ -62,6 +69,18 @@ func (h *Handler) GetCartByUserIDHandler(w http.ResponseWriter, r *http.Request)
 	if err := uid.Scan(userID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
 		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid User ID", invalidUserIDErrorMsg)
+		return
+	}
+
+	userExists, err := h.userValidator.ValidateUserExists(ctx, userID)
+	if err != nil {
+		h.logger.Error("error validating user existence", "error", err, "user_id", userID)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Error validating user existence")
+		return
+	}
+	if !userExists {
+		h.logger.Warn("user does not exist", "user_id", userID)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "User Does Not Exist", "The specified user does not exist")
 		return
 	}
 
@@ -103,7 +122,31 @@ func (h *Handler) CreateCartHandler(w http.ResponseWriter, r *http.Request) {
 	var userID pgtype.UUID
 	if err := userID.Scan(req.UserID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid User ID", invalidUserIDErrorMsg)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "User ID malformed", invalidUserIDErrorMsg)
+		return
+	}
+
+	userExists, err := h.userValidator.ValidateUserExists(ctx, req.UserID)
+	if err != nil {
+		h.logger.Error("error validating user existence", "error", err, "user_id", req.UserID)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Error validating user existence")
+		return
+	}
+	if !userExists {
+		h.logger.Warn("user does not exist", "user_id", req.UserID)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "User Does Not Exist", "The specified user does not exist")
+		return
+	}
+
+	_, err = h.queries.GetCartByUserID(ctx, userID)
+	if err == nil {
+		h.logger.Warn("cart already exists for user", "user_id", req.UserID)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Cart Already Exists", "A cart already exists for the specified user")
+		return
+	}
+	if err != pgx.ErrNoRows {
+		h.logger.Error("error checking existing cart for user", "error", err, "user_id", req.UserID)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Error checking existing cart for user")
 		return
 	}
 
