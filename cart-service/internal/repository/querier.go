@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	CreateCart(ctx context.Context, userID pgtype.UUID) (Cart, error)
 	GetCartByUserID(ctx context.Context, userID pgtype.UUID) (Cart, error)
+	GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUID) ([]GetCartProductsByCartIDRow, error)
 }
 
 var _ Querier = (*Queries)(nil)
