@@ -35,3 +35,34 @@ func (q *Queries) GetCartByUserID(ctx context.Context, userID pgtype.UUID) (Cart
 	err := row.Scan(&i.ID, &i.UserID, &i.CreatedAt)
 	return i, err
 }
+
+const getCartProductsByCartID = `-- name: GetCartProductsByCartID :many
+SELECT product_id, quantity
+FROM carts_products
+WHERE cart_id = $1
+`
+
+type GetCartProductsByCartIDRow struct {
+	ProductID pgtype.UUID `json:"productId"`
+	Quantity  int32       `json:"quantity"`
+}
+
+func (q *Queries) GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUID) ([]GetCartProductsByCartIDRow, error) {
+	rows, err := q.db.Query(ctx, getCartProductsByCartID, cartID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCartProductsByCartIDRow
+	for rows.Next() {
+		var i GetCartProductsByCartIDRow
+		if err := rows.Scan(&i.ProductID, &i.Quantity); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

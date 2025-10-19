@@ -27,33 +27,61 @@ type UserValidator interface {
 	ValidateUserExists(ctx context.Context, userID string) (bool, error)
 }
 
+type ProductByIDResponse struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+}
+
+type ProductFetcher interface {
+	GetProductsByIDs(ctx context.Context, ids []string) (map[string]ProductByIDResponse, error)
+}
+
 type Handler struct {
-	queries       repository.Querier
-	userValidator UserValidator
-	logger        logs.Logger
+	queries        repository.Querier
+	userValidator  UserValidator
+	productFetcher ProductFetcher
+	logger         logs.Logger
 }
 
 type CartRequest struct {
 	UserID string `json:"userId"`
 }
 
-type CartResponse struct {
+type CreateCartResponse struct {
 	ID     string `json:"id"`
 	UserID string `json:"userId"`
 }
 
-func newCartResponse(cart repository.Cart) CartResponse {
-	return CartResponse{
+func newCartResponse(cart repository.Cart) CreateCartResponse {
+	return CreateCartResponse{
 		ID:     cart.ID.String(),
 		UserID: cart.UserID.String(),
 	}
 }
 
-func NewHandler(queries repository.Querier, userValidator UserValidator, logger logs.Logger) *Handler {
+type CartProductResponse struct {
+	ProductID   string  `json:"productId"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+	Quantity    int     `json:"quantity"`
+}
+
+type GetCartResponse struct {
+	ID         string                `json:"id"`
+	UserID     string                `json:"userId"`
+	Products   []CartProductResponse `json:"products"`
+	TotalPrice float64               `json:"totalPrice"`
+}
+
+func NewHandler(queries repository.Querier, userValidator UserValidator, productFetcher ProductFetcher, logger logs.Logger) *Handler {
 	return &Handler{
-		queries:       queries,
-		userValidator: userValidator,
-		logger:        logger,
+		queries:        queries,
+		userValidator:  userValidator,
+		productFetcher: productFetcher,
+		logger:         logger,
 	}
 }
 
@@ -102,7 +130,54 @@ func (h *Handler) GetCartByUserIDHandler(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	web.RespondWithJSON(w, h.logger, http.StatusOK, newCartResponse(cart))
+	cartProducts, err := h.queries.GetCartProductsByCartID(ctx, cart.ID)
+	if err != nil {
+		h.logger.Error("failed to get cart products by cart id", "error", err, "cart_id", cart.ID)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to get cart products")
+		return
+	}
+
+	productsID := make([]string, 0, len(cartProducts))
+	for _, cp := range cartProducts {
+		productsID = append(productsID, cp.ProductID.String())
+	}
+
+	productsMap, err := h.productFetcher.GetProductsByIDs(ctx, productsID)
+	if err != nil {
+		h.logger.Error("failed to fetch products by ids", "error", err, "product_ids", productsID)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to fetch products")
+		return
+	}
+
+	cartProductResponses := make([]CartProductResponse, 0, len(cartProducts))
+	var totalPrice float64
+	for _, cp := range cartProducts {
+		productIDStr := cp.ProductID.String()
+		product, exists := productsMap[productIDStr]
+		if !exists {
+			h.logger.Warn("product not found in fetched products", "product_id", productIDStr)
+			continue
+		}
+
+		cartProductResponse := CartProductResponse{
+			ProductID:   product.ID,
+			Name:        product.Name,
+			Description: product.Description,
+			Price:       product.Price,
+			Quantity:    int(cp.Quantity),
+		}
+		cartProductResponses = append(cartProductResponses, cartProductResponse)
+		totalPrice += product.Price * float64(cp.Quantity)
+	}
+
+	response := GetCartResponse{
+		ID:         cart.ID.String(),
+		UserID:     cart.UserID.String(),
+		Products:   cartProductResponses,
+		TotalPrice: totalPrice,
+	}
+
+	web.RespondWithJSON(w, h.logger, http.StatusOK, response)
 }
 
 func (h *Handler) CreateCartHandler(w http.ResponseWriter, r *http.Request) {

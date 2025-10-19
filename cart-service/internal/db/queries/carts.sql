@@ -6,3 +6,8 @@ WHERE user_id = $1;
 INSERT INTO carts (user_id)
 VALUES ($1)
 RETURNING *;
+
+-- name: GetCartProductsByCartID :many
+SELECT product_id, quantity
+FROM carts_products
+WHERE cart_id = $1;
