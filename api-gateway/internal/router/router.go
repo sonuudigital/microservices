@@ -32,6 +32,11 @@ func New(authHandler *handlers.AuthHandler, jwtManager *auth.JWTManager, logger 
 		return nil, err
 	}
 
+	err = configCartRoutes(mux, authMw, logger)
+	if err != nil {
+		return nil, err
+	}
+
 	return mux, nil
 }
 
@@ -65,6 +70,20 @@ func configProductRoutes(mux *http.ServeMux, authMiddleware authMiddleware, logg
 	mux.Handle("POST /api/products", protectedProductProxy)
 	mux.Handle("PUT /api/products/{id}", protectedProductProxy)
 	mux.Handle("DELETE /api/products/{id}", protectedProductProxy)
+
+	return nil
+}
+
+func configCartRoutes(mux *http.ServeMux, authMiddleware authMiddleware, logger logs.Logger) error {
+	cartServiceURL := os.Getenv("CART_SERVICE_URL")
+	cartProxy, err := handlers.NewProxyHandler(cartServiceURL, logger)
+	if err != nil {
+		logger.Error("failed to create cart service proxy", "error", err)
+		return err
+	}
+
+	mux.Handle("GET /api/carts/{id}", cartProxy)
+	mux.Handle("POST /api/carts", cartProxy)
 
 	return nil
 }
