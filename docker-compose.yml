@@ -14,6 +14,7 @@ services:
       PORT: ${API_GATEWAY_PORT}
       USER_SERVICE_URL: ${USER_SERVICE_URL}
       PRODUCT_SERVICE_URL: ${PRODUCT_SERVICE_URL}
+      CART_SERVICE_URL: ${CART_SERVICE_URL}
       LOG_LEVEL: ${LOG_LEVEL}
       JWT_PRIVATE_KEY_PATH: /certs/private.pem
       JWT_PUBLIC_KEY_PATH: /certs/public.pem
@@ -67,6 +68,7 @@ services:
       PORT: ${CART_SERVICE_PORT}
       DATABASE_URL: postgres://${CART_POSTGRES_USER}:${CART_POSTGRES_PASSWORD}@cart-db:5432/${CART_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
+      USER_SERVICE_URL: ${USER_SERVICE_URL}
     depends_on:
       cart-db:
         condition: service_healthy
@@ -134,7 +136,7 @@ services:
       retries: 10
 
   pgadmin:
-    image: dpage/pgadmin4:9.8.0
+    image: dpage/pgadmin4:9.9.0
     hostname: pgadmin
     container_name: pgadmin
     environment:
@@ -146,6 +148,8 @@ services:
       user-db:
         condition: service_healthy
       product-db:
+        condition: service_healthy
+      cart-db:
         condition: service_healthy
     networks:
       - ecommerce-network
