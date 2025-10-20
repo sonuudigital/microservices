@@ -83,7 +83,7 @@ func configCartRoutes(mux *http.ServeMux, authMiddleware authMiddleware, logger 
 	}
 	protectedCartProxy := authMiddleware(cartProxy)
 
-	mux.Handle("GET /api/carts", cartProxy)
+	mux.Handle("GET /api/carts", protectedCartProxy)
 	mux.Handle("DELETE /api/carts", protectedCartProxy)
 	mux.Handle("POST /api/carts/products", protectedCartProxy)
 	mux.Handle("DELETE /api/carts/products/{productId}", protectedCartProxy)
