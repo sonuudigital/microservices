@@ -21,6 +21,6 @@ INSERT INTO carts_products (cart_id, product_id, quantity, price)
 VALUES (@cart_id, @product_id, @quantity, @price)
 ON CONFLICT (cart_id, product_id)
 DO UPDATE SET
-    quantity = carts_products.quantity + @quantity,
+    quantity = @quantity,
     price = EXCLUDED.price
 RETURNING *;
