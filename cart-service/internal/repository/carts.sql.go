@@ -112,3 +112,18 @@ func (q *Queries) GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUI
 	}
 	return items, nil
 }
+
+const removeProductFromCart = `-- name: RemoveProductFromCart :exec
+DELETE FROM carts_products
+WHERE cart_id = (SELECT id FROM carts WHERE user_id = $1) AND product_id = $2
+`
+
+type RemoveProductFromCartParams struct {
+	UserID    pgtype.UUID `json:"userId"`
+	ProductID pgtype.UUID `json:"productId"`
+}
+
+func (q *Queries) RemoveProductFromCart(ctx context.Context, arg RemoveProductFromCartParams) error {
+	_, err := q.db.Exec(ctx, removeProductFromCart, arg.UserID, arg.ProductID)
+	return err
+}

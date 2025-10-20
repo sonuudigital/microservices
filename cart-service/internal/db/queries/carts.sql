@@ -24,3 +24,12 @@ DO UPDATE SET
     quantity = @quantity,
     price = EXCLUDED.price
 RETURNING *;
+
+-- name: RemoveProductFromCart :exec
+DELETE FROM carts_products
+WHERE cart_id = (
+    SELECT id
+    FROM carts
+    WHERE user_id = $1
+)
+AND product_id = $2;
