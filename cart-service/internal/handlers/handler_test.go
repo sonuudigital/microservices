@@ -31,6 +31,7 @@ const (
 	productsPath               = "/products"
 	productsIDPath             = "/products/" + productIDTest
 	invalidUserIDErrorTitleMsg = "Invalid user ID"
+	userIDHeader               = "X-User-ID"
 )
 
 type MockQuerier struct {
@@ -89,15 +90,6 @@ func (m *MockQuerier) ClearCartProductsByUserID(ctx context.Context, userID pgty
 	return m.Called(ctx, userID).Error(0)
 }
 
-type MockUserValidator struct {
-	mock.Mock
-}
-
-func (m *MockUserValidator) ValidateUserExists(ctx context.Context, userID string) (bool, error) {
-	args := m.Called(ctx, userID)
-	return args.Bool(0), args.Error(1)
-}
-
 type MockProductFetcher struct {
 	mock.Mock
 }
@@ -110,26 +102,23 @@ func (m *MockProductFetcher) GetProductsByIDs(ctx context.Context, ids []string)
 	return nil, args.Error(1)
 }
 
-func TestGetCartByUserIDHandler(t *testing.T) {
-	t.Run("Success", testGetCartByUserIDSuccess)
-	t.Run("Not Found", testGetCartByUserIDNotFound)
-	t.Run("Invalid ID", testGetCartByUserIDInvalidID)
+func TestGetCartHandler(t *testing.T) {
+	t.Run("Success", testGetCartSuccess)
+	t.Run("Not Found", testGetCartNotFound)
+	t.Run("Invalid ID", testGetCartInvalidID)
 }
 
-func testGetCartByUserIDSuccess(t *testing.T) {
+func testGetCartSuccess(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID, cartUUID, product1UUID, product2UUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
 	_ = cartUUID.Scan(cartUUIDTest)
 	_ = product1UUID.Scan("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13")
 	_ = product2UUID.Scan("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14")
-
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 
 	expectedCart := repository.Cart{ID: cartUUID, UserID: userUUID}
 	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(expectedCart, nil).Once()
@@ -147,10 +136,10 @@ func testGetCartByUserIDSuccess(t *testing.T) {
 	}
 	mockProductFetcher.On("GetProductsByIDs", mock.Anything, productIDs).Return(fetchedProducts, nil).Once()
 
-	req, _ := http.NewRequest("GET", cartsURL+"/"+uuidTest, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("GET", cartsURL, nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
-	handler.GetCartByUserIDHandler(rr, req)
+	handler.GetCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
@@ -181,187 +170,85 @@ func testGetCartByUserIDSuccess(t *testing.T) {
 	assert.Equal(t, 5.50, p2.Price)
 
 	mockQuerier.AssertExpectations(t)
-	mockUserValidator.AssertExpectations(t)
 	mockProductFetcher.AssertExpectations(t)
 }
 
-func testGetCartByUserIDNotFound(t *testing.T) {
+func testGetCartNotFound(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var pgUUID pgtype.UUID
 	_ = pgUUID.Scan(uuidTest)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 	mockQuerier.On("GetCartByUserID", mock.Anything, pgUUID).Return(repository.Cart{}, pgx.ErrNoRows).Once()
 
-	req, _ := http.NewRequest("GET", cartsURL+"/"+uuidTest, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("GET", cartsURL, nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
-	handler.GetCartByUserIDHandler(rr, req)
+	handler.GetCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusNotFound, rr.Code)
 	mockQuerier.AssertExpectations(t)
-	mockUserValidator.AssertExpectations(t)
 }
 
-func testGetCartByUserIDInvalidID(t *testing.T) {
+func testGetCartInvalidID(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	req, _ := http.NewRequest("GET", cartsURL+"/invalid-uuid", nil)
-	req.SetPathValue("userId", invalidUUIDPathTest)
+	req, _ := http.NewRequest("GET", cartsURL, nil)
+	req.Header.Set(userIDHeader, invalidUUIDPathTest)
 	rr := httptest.NewRecorder()
 
-	handler.GetCartByUserIDHandler(rr, req)
+	handler.GetCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
-func TestDeleteCartByUserIDHandler(t *testing.T) {
-	t.Run("Success", testDeleteCartByUserIDSuccess)
-	t.Run("User Does Not Exist", testDeleteCartByUserIDUserDoesNotExist)
-	t.Run("User Validation Fails", testDeleteCartByUserIDUserValidationFails)
-	t.Run("Cart Not Found", testDeleteCartByUserIDCartNotFound)
-	t.Run("DB Error on Delete", testDeleteCartByUserIDDBError)
-	t.Run("Invalid User ID", testDeleteCartByUserIDInvalidID)
+func TestDeleteCartHandler(t *testing.T) {
+	t.Run("Success", testDeleteCartSuccess)
+	t.Run("Invalid User ID", testDeleteCartInvalidID)
 }
 
-func testDeleteCartByUserIDSuccess(t *testing.T) {
+func testDeleteCartSuccess(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var pgUUID pgtype.UUID
 	_ = pgUUID.Scan(uuidTest)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 	mockQuerier.On("DeleteCartByUserID", mock.Anything, pgUUID).Return(nil).Once()
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("DELETE", cartsURL, nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
-	handler.DeleteCartByUserIDHandler(rr, req)
+	handler.DeleteCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusNoContent, rr.Code)
 	mockQuerier.AssertExpectations(t)
-	mockUserValidator.AssertExpectations(t)
 }
 
-func testDeleteCartByUserIDUserDoesNotExist(t *testing.T) {
+func testDeleteCartInvalidID(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, nil).Once()
-
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("DELETE", cartsURL, nil)
+	req.Header.Set(userIDHeader, invalidUUIDPathTest)
 	rr := httptest.NewRecorder()
 
-	handler.DeleteCartByUserIDHandler(rr, req)
+	handler.DeleteCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	mockQuerier.AssertNotCalled(t, "DeleteCartByUserID", mock.Anything, mock.Anything)
-	mockUserValidator.AssertExpectations(t)
-}
-
-func testDeleteCartByUserIDUserValidationFails(t *testing.T) {
-	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
-	mockProductFetcher := new(MockProductFetcher)
-	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
-
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, errors.New(networkErrorMsg)).Once()
-
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest, nil)
-	req.SetPathValue("userId", uuidTest)
-	rr := httptest.NewRecorder()
-
-	handler.DeleteCartByUserIDHandler(rr, req)
-
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	mockQuerier.AssertNotCalled(t, "DeleteCartByUserID", mock.Anything, mock.Anything)
-	mockUserValidator.AssertExpectations(t)
-}
-
-func testDeleteCartByUserIDCartNotFound(t *testing.T) {
-	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
-	mockProductFetcher := new(MockProductFetcher)
-	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
-
-	var pgUUID pgtype.UUID
-	_ = pgUUID.Scan(uuidTest)
-
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
-	mockQuerier.On("DeleteCartByUserID", mock.Anything, pgUUID).Return(pgx.ErrNoRows).Once()
-
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest, nil)
-	req.SetPathValue("userId", uuidTest)
-	rr := httptest.NewRecorder()
-
-	handler.DeleteCartByUserIDHandler(rr, req)
-
-	assert.Equal(t, http.StatusNotFound, rr.Code)
-	mockQuerier.AssertExpectations(t)
-	mockUserValidator.AssertExpectations(t)
-}
-
-func testDeleteCartByUserIDDBError(t *testing.T) {
-	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
-	mockProductFetcher := new(MockProductFetcher)
-	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
-
-	var pgUUID pgtype.UUID
-	_ = pgUUID.Scan(uuidTest)
-
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
-	mockQuerier.On("DeleteCartByUserID", mock.Anything, pgUUID).Return(errors.New(dbErrorMsg)).Once()
-
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest, nil)
-	req.SetPathValue("userId", uuidTest)
-	rr := httptest.NewRecorder()
-
-	handler.DeleteCartByUserIDHandler(rr, req)
-
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	mockQuerier.AssertExpectations(t)
-	mockUserValidator.AssertExpectations(t)
-}
-
-func testDeleteCartByUserIDInvalidID(t *testing.T) {
-	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
-	mockProductFetcher := new(MockProductFetcher)
-	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
-
-	req, _ := http.NewRequest("DELETE", cartsURL+"/invalid-uuid", nil)
-	req.SetPathValue("userId", invalidUUIDPathTest)
-	rr := httptest.NewRecorder()
-
-	handler.DeleteCartByUserIDHandler(rr, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	mockQuerier.AssertNotCalled(t, "DeleteCartByUserID", mock.Anything, mock.Anything)
-	mockUserValidator.AssertNotCalled(t, "ValidateUserExists", mock.Anything, mock.Anything)
 }
 
 func TestAddProductToCartHandler(t *testing.T) {
@@ -376,10 +263,9 @@ func TestAddProductToCartHandler(t *testing.T) {
 
 func testAddProductToCartSuccessNewCart(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID, cartUUID, productUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
@@ -413,8 +299,8 @@ func testAddProductToCartSuccessNewCart(t *testing.T) {
 
 	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
 	body, _ := json.Marshal(addProductReq)
-	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("POST", cartsURL+productsPath, bytes.NewBuffer(body))
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
 	handler.AddProductToCartHandler(rr, req)
@@ -432,10 +318,9 @@ func testAddProductToCartSuccessNewCart(t *testing.T) {
 
 func testAddProductToCartSuccessExistingCart(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID, cartUUID, productUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
@@ -468,8 +353,8 @@ func testAddProductToCartSuccessExistingCart(t *testing.T) {
 
 	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 2}
 	body, _ := json.Marshal(addProductReq)
-	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("POST", cartsURL+productsPath, bytes.NewBuffer(body))
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
 	handler.AddProductToCartHandler(rr, req)
@@ -487,15 +372,14 @@ func testAddProductToCartSuccessExistingCart(t *testing.T) {
 
 func testAddProductToCartInvalidUserID(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
 	body, _ := json.Marshal(addProductReq)
-	req, _ := http.NewRequest("POST", cartsURL+"/invalid-uuid/products", bytes.NewBuffer(body))
-	req.SetPathValue("userId", invalidUUIDPathTest)
+	req, _ := http.NewRequest("POST", cartsURL+productsPath, bytes.NewBuffer(body))
+	req.Header.Set(userIDHeader, invalidUUIDPathTest)
 	rr := httptest.NewRecorder()
 
 	handler.AddProductToCartHandler(rr, req)
@@ -505,13 +389,12 @@ func testAddProductToCartInvalidUserID(t *testing.T) {
 
 func testAddProductToCartInvalidRequestBody(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBufferString("{invalid-json}"))
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("POST", cartsURL+productsPath, bytes.NewBufferString("{invalid-json}"))
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
 	handler.AddProductToCartHandler(rr, req)
@@ -521,10 +404,9 @@ func testAddProductToCartInvalidRequestBody(t *testing.T) {
 
 func testAddProductToCartProductNotFound(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID, cartUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
@@ -535,8 +417,8 @@ func testAddProductToCartProductNotFound(t *testing.T) {
 
 	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
 	body, _ := json.Marshal(addProductReq)
-	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("POST", cartsURL+productsPath, bytes.NewBuffer(body))
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
 	handler.AddProductToCartHandler(rr, req)
@@ -548,10 +430,9 @@ func testAddProductToCartProductNotFound(t *testing.T) {
 
 func testAddProductToCartProductFetcherError(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID, cartUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
@@ -562,8 +443,8 @@ func testAddProductToCartProductFetcherError(t *testing.T) {
 
 	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
 	body, _ := json.Marshal(addProductReq)
-	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("POST", cartsURL+productsPath, bytes.NewBuffer(body))
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
 	handler.AddProductToCartHandler(rr, req)
@@ -575,10 +456,9 @@ func testAddProductToCartProductFetcherError(t *testing.T) {
 
 func testAddProductToCartDBErrorOnAdd(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID, cartUUID, productUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
@@ -602,8 +482,8 @@ func testAddProductToCartDBErrorOnAdd(t *testing.T) {
 
 	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
 	body, _ := json.Marshal(addProductReq)
-	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("POST", cartsURL+productsPath, bytes.NewBuffer(body))
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
 	handler.AddProductToCartHandler(rr, req)
@@ -617,8 +497,6 @@ func TestRemoveProductFromCartHandler(t *testing.T) {
 	t.Run("Success", testRemoveProductFromCartSuccess)
 	t.Run(invalidUserIDErrorTitleMsg, testRemoveProductFromCartInvalidUserID)
 	t.Run("Invalid product ID", testRemoveProductFromCartInvalidProductID)
-	t.Run("User does not exist", testRemoveProductFromCartUserDoesNotExist)
-	t.Run("User validator error", testRemoveProductFromCartUserValidatorError)
 	t.Run("Product not found", testRemoveProductFromCartProductNotFound)
 	t.Run("Product fetcher error", testRemoveProductFromCartProductFetcherError)
 	t.Run("DB error", testRemoveProductFromCartDBError)
@@ -626,16 +504,14 @@ func TestRemoveProductFromCartHandler(t *testing.T) {
 
 func testRemoveProductFromCartSuccess(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID, productUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
 	_ = productUUID.Scan(productIDTest)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
 		productIDTest: {ID: productIDTest},
 	}, nil).Once()
@@ -644,8 +520,8 @@ func testRemoveProductFromCartSuccess(t *testing.T) {
 		ProductID: productUUID,
 	}).Return(nil).Once()
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsIDPath+productIDTest, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("DELETE", cartsURL+productsIDPath, nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	req.SetPathValue("productId", productIDTest)
 	rr := httptest.NewRecorder()
 
@@ -653,19 +529,17 @@ func testRemoveProductFromCartSuccess(t *testing.T) {
 
 	assert.Equal(t, http.StatusNoContent, rr.Code)
 	mockQuerier.AssertExpectations(t)
-	mockUserValidator.AssertExpectations(t)
 	mockProductFetcher.AssertExpectations(t)
 }
 
 func testRemoveProductFromCartInvalidUserID(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/invalid-uuid/products/"+productIDTest, nil)
-	req.SetPathValue("userId", invalidUUIDPathTest)
+	req, _ := http.NewRequest("DELETE", cartsURL+"/products/"+productIDTest, nil)
+	req.Header.Set(userIDHeader, invalidUUIDPathTest)
 	req.SetPathValue("productId", productIDTest)
 	rr := httptest.NewRecorder()
 
@@ -676,13 +550,12 @@ func testRemoveProductFromCartInvalidUserID(t *testing.T) {
 
 func testRemoveProductFromCartInvalidProductID(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+"/products/invalid-uuid", nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("DELETE", cartsURL+"/products/invalid-uuid", nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	req.SetPathValue("productId", invalidUUIDPathTest)
 	rr := httptest.NewRecorder()
 
@@ -691,110 +564,56 @@ func testRemoveProductFromCartInvalidProductID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
-func testRemoveProductFromCartUserDoesNotExist(t *testing.T) {
-	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
-	mockProductFetcher := new(MockProductFetcher)
-	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
-
-	var userUUID, productUUID pgtype.UUID
-	_ = userUUID.Scan(uuidTest)
-	_ = productUUID.Scan(productIDTest)
-
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, nil).Once()
-
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsIDPath+productIDTest, nil)
-	req.SetPathValue("userId", uuidTest)
-	req.SetPathValue("productId", productIDTest)
-	rr := httptest.NewRecorder()
-
-	handler.RemoveProductFromCartHandler(rr, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	mockUserValidator.AssertExpectations(t)
-	mockQuerier.AssertNotCalled(t, "RemoveProductFromCart", mock.Anything, mock.Anything)
-}
-
-func testRemoveProductFromCartUserValidatorError(t *testing.T) {
-	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
-	mockProductFetcher := new(MockProductFetcher)
-	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
-
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, errors.New(networkErrorMsg)).Once()
-
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsIDPath+productIDTest, nil)
-	req.SetPathValue("userId", uuidTest)
-	req.SetPathValue("productId", productIDTest)
-	rr := httptest.NewRecorder()
-
-	handler.RemoveProductFromCartHandler(rr, req)
-
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	mockUserValidator.AssertExpectations(t)
-	mockQuerier.AssertNotCalled(t, "RemoveProductFromCart", mock.Anything, mock.Anything)
-}
-
 func testRemoveProductFromCartProductNotFound(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{}, nil).Once()
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsIDPath+productIDTest, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("DELETE", cartsURL+productsIDPath, nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	req.SetPathValue("productId", productIDTest)
 	rr := httptest.NewRecorder()
 
 	handler.RemoveProductFromCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	mockUserValidator.AssertExpectations(t)
 	mockProductFetcher.AssertExpectations(t)
 	mockQuerier.AssertNotCalled(t, "RemoveProductFromCart", mock.Anything, mock.Anything)
 }
 
 func testRemoveProductFromCartProductFetcherError(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(nil, errors.New(networkErrorMsg)).Once()
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsIDPath+productIDTest, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("DELETE", cartsURL+productsIDPath, nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	req.SetPathValue("productId", productIDTest)
 	rr := httptest.NewRecorder()
 
 	handler.RemoveProductFromCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	mockUserValidator.AssertExpectations(t)
 	mockProductFetcher.AssertExpectations(t)
 	mockQuerier.AssertNotCalled(t, "RemoveProductFromCart", mock.Anything, mock.Anything)
 }
 
 func testRemoveProductFromCartDBError(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID, productUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
 	_ = productUUID.Scan(productIDTest)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
 		productIDTest: {ID: productIDTest},
 	}, nil).Once()
@@ -803,8 +622,8 @@ func testRemoveProductFromCartDBError(t *testing.T) {
 		ProductID: productUUID,
 	}).Return(errors.New(dbErrorMsg)).Once()
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsIDPath+productIDTest, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("DELETE", cartsURL+productsIDPath, nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	req.SetPathValue("productId", productIDTest)
 	rr := httptest.NewRecorder()
 
@@ -812,118 +631,68 @@ func testRemoveProductFromCartDBError(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	mockQuerier.AssertExpectations(t)
-	mockUserValidator.AssertExpectations(t)
 	mockProductFetcher.AssertExpectations(t)
 }
 
-func TestClearCartProductsByUserIDHandler(t *testing.T) {
-	t.Run("Success", testClearCartProductsByUserIDSuccess)
-	t.Run(invalidUserIDErrorTitleMsg, testClearCartProductsByUserIDInvalidID)
-	t.Run("User does not exist", testClearCartProductsByUserIDUserDoesNotExist)
-	t.Run("User validator error", testClearCartProductsByUserIDUserValidatorError)
-	t.Run("DB error", testClearCartProductsByUserIDDBError)
+func TestClearCartHandler(t *testing.T) {
+	t.Run("Success", testClearCartSuccess)
+	t.Run(invalidUserIDErrorTitleMsg, testClearCartInvalidID)
+	t.Run("DB error", testClearCartDBError)
 }
 
-func testClearCartProductsByUserIDSuccess(t *testing.T) {
+func testClearCartSuccess(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 	mockQuerier.On("ClearCartProductsByUserID", mock.Anything, userUUID).Return(nil).Once()
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsPath, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("DELETE", cartsURL+productsPath, nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
-	handler.ClearCartProductsByUserIDHandler(rr, req)
+	handler.ClearCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusNoContent, rr.Code)
 	mockQuerier.AssertExpectations(t)
-	mockUserValidator.AssertExpectations(t)
 }
 
-func testClearCartProductsByUserIDInvalidID(t *testing.T) {
+func testClearCartInvalidID(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/invalid-uuid/products", nil)
-	req.SetPathValue("userId", "invalid-uuid")
+	req, _ := http.NewRequest("DELETE", cartsURL+productsPath, nil)
+	req.Header.Set(userIDHeader, "invalid-uuid")
 	rr := httptest.NewRecorder()
 
-	handler.ClearCartProductsByUserIDHandler(rr, req)
+	handler.ClearCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
-func testClearCartProductsByUserIDUserDoesNotExist(t *testing.T) {
+func testClearCartDBError(t *testing.T) {
 	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
 	mockProductFetcher := new(MockProductFetcher)
 	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
-
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, nil).Once()
-
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsPath, nil)
-	req.SetPathValue("userId", uuidTest)
-	rr := httptest.NewRecorder()
-
-	handler.ClearCartProductsByUserIDHandler(rr, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	mockUserValidator.AssertExpectations(t)
-	mockQuerier.AssertNotCalled(t, "ClearCartProductsByUserID", mock.Anything, mock.Anything)
-}
-
-func testClearCartProductsByUserIDUserValidatorError(t *testing.T) {
-	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
-	mockProductFetcher := new(MockProductFetcher)
-	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
-
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, errors.New("network error")).Once()
-
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsPath, nil)
-	req.SetPathValue("userId", uuidTest)
-	rr := httptest.NewRecorder()
-
-	handler.ClearCartProductsByUserIDHandler(rr, req)
-
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	mockUserValidator.AssertExpectations(t)
-	mockQuerier.AssertNotCalled(t, "ClearCartProductsByUserID", mock.Anything, mock.Anything)
-}
-
-func testClearCartProductsByUserIDDBError(t *testing.T) {
-	mockQuerier := new(MockQuerier)
-	mockUserValidator := new(MockUserValidator)
-	mockProductFetcher := new(MockProductFetcher)
-	logger := logs.NewSlogLogger()
-	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
 	var userUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 	mockQuerier.On("ClearCartProductsByUserID", mock.Anything, userUUID).Return(errors.New(dbErrorMsg)).Once()
 
-	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest+productsPath, nil)
-	req.SetPathValue("userId", uuidTest)
+	req, _ := http.NewRequest("DELETE", cartsURL+productsPath, nil)
+	req.Header.Set(userIDHeader, uuidTest)
 	rr := httptest.NewRecorder()
 
-	handler.ClearCartProductsByUserIDHandler(rr, req)
+	handler.ClearCartHandler(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	mockQuerier.AssertExpectations(t)
-	mockUserValidator.AssertExpectations(t)
 }

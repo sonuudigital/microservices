@@ -14,13 +14,8 @@ import (
 )
 
 const (
-	invalidUserIDErrorTitleMsg         = "Invalid User ID"
-	invalidUserIDErrorMsg              = "invalid user id"
-	userValidationErrorTitleMsg        = "Error validating user existence"
-	userValidationErrorMsg             = "error validating user existence"
-	userDoesNotExistErrorTitleMsg      = "User Does Not Exist"
-	userDoesNotExistErrorMsg           = "user does not exist"
-	specifiedUserDoesNotExistsErrorMsg = "The specified user does not exist"
+	invalidUserIDErrorTitleMsg = "Invalid User ID"
+	invalidUserIDErrorMsg      = "invalid user id"
 
 	invalidProductIDErrorMsg = "invalid product id"
 
@@ -31,11 +26,8 @@ const (
 
 	requestTimeoutTitleMsg      = "Request Timeout"
 	internalServerErrorTitleMsg = "Internal Server Error"
+	userIdHeader                = "X-User-ID"
 )
-
-type UserValidator interface {
-	ValidateUserExists(ctx context.Context, userID string) (bool, error)
-}
 
 type ProductFetcher interface {
 	GetProductsByIDs(ctx context.Context, ids []string) (map[string]ProductByIDResponse, error)
@@ -50,7 +42,6 @@ type ProductByIDResponse struct {
 
 type Handler struct {
 	queries        repository.Querier
-	userValidator  UserValidator
 	productFetcher ProductFetcher
 	logger         logs.Logger
 }
@@ -103,39 +94,26 @@ func newAddProductResponse(cp repository.CartsProduct) AddProductResponse {
 	}
 }
 
-func NewHandler(queries repository.Querier, userValidator UserValidator, productFetcher ProductFetcher, logger logs.Logger) *Handler {
+func NewHandler(queries repository.Querier, productFetcher ProductFetcher, logger logs.Logger) *Handler {
 	return &Handler{
 		queries:        queries,
-		userValidator:  userValidator,
 		productFetcher: productFetcher,
 		logger:         logger,
 	}
 }
 
-func (h *Handler) GetCartByUserIDHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetCartHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
 		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
 		return
 	}
 
-	userID := r.PathValue("userId")
+	userID := r.Header.Get(userIdHeader)
 	var uid pgtype.UUID
 	if err := uid.Scan(userID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
 		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidUserIDErrorTitleMsg, invalidUserIDErrorMsg)
-		return
-	}
-
-	userExists, err := h.userValidator.ValidateUserExists(ctx, userID)
-	if err != nil {
-		h.logger.Error(userValidationErrorMsg, "error", err, "user_id", userID)
-		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, userValidationErrorTitleMsg)
-		return
-	}
-	if !userExists {
-		h.logger.Warn(userDoesNotExistErrorMsg, "user_id", userID)
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, userDoesNotExistErrorTitleMsg, specifiedUserDoesNotExistsErrorMsg)
 		return
 	}
 
@@ -207,28 +185,18 @@ func (h *Handler) GetCartByUserIDHandler(w http.ResponseWriter, r *http.Request)
 	web.RespondWithJSON(w, h.logger, http.StatusOK, response)
 }
 
-func (h *Handler) DeleteCartByUserIDHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteCartHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
 		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
 		return
 	}
 
-	userID := r.PathValue("userId")
+	userID := r.Header.Get(userIdHeader)
 	var uid pgtype.UUID
 	if err := uid.Scan(userID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
 		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidUserIDErrorTitleMsg, invalidUserIDErrorMsg)
-		return
-	}
-
-	userExists, err := h.userValidator.ValidateUserExists(ctx, userID)
-	if err != nil {
-		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, userValidationErrorTitleMsg)
-		return
-	}
-	if !userExists {
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, userDoesNotExistErrorTitleMsg, specifiedUserDoesNotExistsErrorMsg)
 		return
 	}
 
@@ -255,7 +223,7 @@ func (h *Handler) AddProductToCartHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userID := r.PathValue("userId")
+	userID := r.Header.Get(userIdHeader)
 	var userUUID pgtype.UUID
 	if err := userUUID.Scan(userID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
@@ -348,7 +316,7 @@ func (h *Handler) RemoveProductFromCartHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	userID := r.PathValue("userId")
+	userID := r.Header.Get(userIdHeader)
 	var userUUID pgtype.UUID
 	if err := userUUID.Scan(userID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
@@ -361,16 +329,6 @@ func (h *Handler) RemoveProductFromCartHandler(w http.ResponseWriter, r *http.Re
 	if err := productUUID.Scan(productID); err != nil {
 		h.logger.Warn(invalidProductIDErrorMsg, "error", err)
 		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Product ID", invalidProductIDErrorMsg)
-		return
-	}
-
-	userExists, err := h.userValidator.ValidateUserExists(ctx, userID)
-	if err != nil {
-		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, userValidationErrorTitleMsg)
-		return
-	}
-	if !userExists {
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, userDoesNotExistErrorTitleMsg, specifiedUserDoesNotExistsErrorMsg)
 		return
 	}
 
@@ -398,14 +356,14 @@ func (h *Handler) RemoveProductFromCartHandler(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) ClearCartProductsByUserIDHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ClearCartHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !web.CheckContext(ctx, h.logger) {
 		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
 		return
 	}
 
-	userID := r.PathValue("userId")
+	userID := r.Header.Get(userIdHeader)
 	var userUUID pgtype.UUID
 	if err := userUUID.Scan(userID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
@@ -413,17 +371,7 @@ func (h *Handler) ClearCartProductsByUserIDHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	userExists, err := h.userValidator.ValidateUserExists(ctx, userID)
-	if err != nil {
-		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, userValidationErrorTitleMsg)
-		return
-	}
-	if !userExists {
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, userDoesNotExistErrorTitleMsg, specifiedUserDoesNotExistsErrorMsg)
-		return
-	}
-
-	err = h.queries.ClearCartProductsByUserID(ctx, userUUID)
+	err := h.queries.ClearCartProductsByUserID(ctx, userUUID)
 	if err != nil {
 		h.logger.Error("failed to clear cart products by user id", "error", err, "user_id", userID)
 		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to clear cart products")

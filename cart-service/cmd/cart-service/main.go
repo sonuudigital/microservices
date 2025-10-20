@@ -29,13 +29,6 @@ func main() {
 	logger.Info("database connected successfully")
 	defer pgDb.Close()
 
-	userServiceURL := os.Getenv("USER_SERVICE_URL")
-	if userServiceURL == "" {
-		logger.Error("USER_SERVICE_URL is not set")
-		os.Exit(1)
-	}
-	userClient := clients.NewUserClient(userServiceURL, logger)
-
 	productServiceURL := os.Getenv("PRODUCT_SERVICE_URL")
 	if productServiceURL == "" {
 		logger.Error("PRODUCT_SERVICE_URL is not set")
@@ -43,7 +36,7 @@ func main() {
 	}
 	productClient := clients.NewProductClient(productServiceURL, logger)
 
-	mux := router.ConfigRoutes(pgDb, userClient, productClient, logger)
+	mux := router.ConfigRoutes(pgDb, productClient, logger)
 
 	port := os.Getenv("PORT")
 	srv, err := web.InitializeServer(port, mux, logger)
