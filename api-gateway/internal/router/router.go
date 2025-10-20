@@ -81,9 +81,13 @@ func configCartRoutes(mux *http.ServeMux, authMiddleware authMiddleware, logger 
 		logger.Error("failed to create cart service proxy", "error", err)
 		return err
 	}
+	protectedCartProxy := authMiddleware(cartProxy)
 
-	mux.Handle("GET /api/carts/{id}", cartProxy)
-	mux.Handle("POST /api/carts", cartProxy)
+	mux.Handle("GET /api/carts", cartProxy)
+	mux.Handle("DELETE /api/carts", protectedCartProxy)
+	mux.Handle("POST /api/carts/products", protectedCartProxy)
+	mux.Handle("DELETE /api/carts/products/{productId}", protectedCartProxy)
+	mux.Handle("DELETE /api/carts/products", protectedCartProxy)
 
 	return nil
 }
