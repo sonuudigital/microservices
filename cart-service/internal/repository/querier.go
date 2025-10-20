@@ -16,6 +16,7 @@ type Querier interface {
 	DeleteCartByUserID(ctx context.Context, userID pgtype.UUID) error
 	GetCartByUserID(ctx context.Context, userID pgtype.UUID) (Cart, error)
 	GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUID) ([]GetCartProductsByCartIDRow, error)
+	RemoveProductFromCart(ctx context.Context, arg RemoveProductFromCartParams) error
 }
 
 var _ Querier = (*Queries)(nil)

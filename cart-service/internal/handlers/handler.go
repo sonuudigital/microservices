@@ -22,6 +22,8 @@ const (
 	userDoesNotExistErrorMsg           = "user does not exist"
 	specifiedUserDoesNotExistsErrorMsg = "The specified user does not exist"
 
+	invalidProductIDErrorMsg = "invalid product id"
+
 	cartNotFoundErrorTitleMsg  = "Cart Not Found"
 	cartNotFoundErrorMsg       = "cart not found"
 	multipleCartsFoundErrorMsg = "multiple carts found for user"
@@ -117,7 +119,7 @@ func (h *Handler) GetCartByUserIDHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	userID := r.PathValue("id")
+	userID := r.PathValue("userId")
 	var uid pgtype.UUID
 	if err := uid.Scan(userID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
@@ -212,7 +214,7 @@ func (h *Handler) DeleteCartByUserIDHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	userID := r.PathValue("id")
+	userID := r.PathValue("userId")
 	var uid pgtype.UUID
 	if err := uid.Scan(userID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
@@ -253,7 +255,7 @@ func (h *Handler) AddProductToCartHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userID := r.PathValue("id")
+	userID := r.PathValue("userId")
 	var userUUID pgtype.UUID
 	if err := userUUID.Scan(userID); err != nil {
 		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
@@ -289,7 +291,7 @@ func (h *Handler) AddProductToCartHandler(w http.ResponseWriter, r *http.Request
 
 	var productUUID pgtype.UUID
 	if err := productUUID.Scan(req.ProductID); err != nil {
-		h.logger.Warn("invalid product id", "error", err)
+		h.logger.Warn(invalidProductIDErrorMsg, "error", err)
 		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Product ID", "The product ID format is invalid")
 		return
 	}
@@ -332,9 +334,66 @@ func (h *Handler) getOrCreateCartByUserID(ctx context.Context, userUUID pgtype.U
 			}
 			return newCart, nil
 		default:
-			h.logger.Error("failed to get cart by user id", "error", err, "user_id", userUUID.String())
+			h.logger.Error(failedGetCartErrorMsg, "error", err, "user_id", userUUID.String())
 			return repository.Cart{}, err
 		}
 	}
 	return cart, nil
+}
+
+func (h *Handler) RemoveProductFromCartHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if !web.CheckContext(ctx, h.logger) {
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
+		return
+	}
+
+	userID := r.PathValue("userId")
+	var userUUID pgtype.UUID
+	if err := userUUID.Scan(userID); err != nil {
+		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidUserIDErrorTitleMsg, invalidUserIDErrorMsg)
+		return
+	}
+
+	productID := r.PathValue("productId")
+	var productUUID pgtype.UUID
+	if err := productUUID.Scan(productID); err != nil {
+		h.logger.Warn(invalidProductIDErrorMsg, "error", err)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Product ID", invalidProductIDErrorMsg)
+		return
+	}
+
+	userExists, err := h.userValidator.ValidateUserExists(ctx, userID)
+	if err != nil {
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, userValidationErrorTitleMsg)
+		return
+	}
+	if !userExists {
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, userDoesNotExistErrorTitleMsg, specifiedUserDoesNotExistsErrorMsg)
+		return
+	}
+
+	product, err := h.productFetcher.GetProductsByIDs(ctx, []string{productID})
+	if err != nil {
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, "Product Fetch Failed", "Could not retrieve product details")
+		return
+	}
+	if _, exists := product[productID]; !exists {
+		h.logger.Warn("product not found", "product_id", productID)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Product Not Found", "The specified product does not exist")
+		return
+	}
+
+	err = h.queries.RemoveProductFromCart(ctx, repository.RemoveProductFromCartParams{
+		UserID:    userUUID,
+		ProductID: productUUID,
+	})
+	if err != nil {
+		h.logger.Error("failed to remove product from cart", "error", err, "user_id", userID, "product_id", productID)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to remove product from cart")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
