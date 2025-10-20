@@ -61,7 +61,7 @@ func (j *JWTManager) WithNowFunc(f func() time.Time) *JWTManager {
 	return j
 }
 
-func (j *JWTManager) GenerateToken(email string) (string, error) {
+func (j *JWTManager) GenerateToken(userID, email string) (string, error) {
 	now := j.now()
 	claims := Claims{
 		Email: email,
@@ -71,7 +71,7 @@ func (j *JWTManager) GenerateToken(email string) (string, error) {
 			NotBefore: jwt.NewNumericDate(now),
 			Issuer:    j.issuer,
 			Audience:  []string{j.audience},
-			Subject:   email,
+			Subject:   userID,
 		},
 	}
 

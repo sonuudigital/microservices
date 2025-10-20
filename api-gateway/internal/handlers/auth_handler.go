@@ -107,7 +107,7 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.jwtManager.GenerateToken(user.Email)
+	token, err := h.jwtManager.GenerateToken(user.ID, user.Email)
 	if err != nil {
 		h.logger.Error("failed to generate token", "error", err)
 		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorMsg, "Failed to generate authentication token.")
