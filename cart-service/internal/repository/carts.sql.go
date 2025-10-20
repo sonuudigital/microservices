@@ -16,7 +16,7 @@ INSERT INTO carts_products (cart_id, product_id, quantity, price)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (cart_id, product_id)
 DO UPDATE SET
-    quantity = carts_products.quantity + $3,
+    quantity = $3,
     price = EXCLUDED.price
 RETURNING id, cart_id, product_id, quantity, price, added_at
 `
