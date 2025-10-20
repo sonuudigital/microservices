@@ -33,3 +33,11 @@ WHERE cart_id = (
     WHERE user_id = $1
 )
 AND product_id = $2;
+
+-- name: ClearCartProductsByUserID :exec
+DELETE FROM carts_products
+WHERE cart_id = (
+    SELECT id
+    FROM carts
+    WHERE user_id = $1
+);
