@@ -20,8 +20,11 @@ import (
 )
 
 const (
-	uuidTest    = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-	productsURL = "/api/products"
+	uuidTest           = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+	productsURL        = "/api/products"
+	dbErrorTitle       = "DB Error"
+	dbErrorMsg         = "db error"
+	apiProductsIdsPath = "/api/products/ids?ids="
 )
 
 type MockQuerier struct {
@@ -65,6 +68,14 @@ func (m *MockQuerier) UpdateProduct(ctx context.Context, arg repository.UpdatePr
 	return repository.Product{}, args.Error(1)
 }
 
+func (m *MockQuerier) GetProductsByIDs(ctx context.Context, productIds []pgtype.UUID) ([]repository.Product, error) {
+	args := m.Called(ctx, productIds)
+	if p, ok := args.Get(0).([]repository.Product); ok {
+		return p, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func TestCreateProductHandler(t *testing.T) {
 	logger := logs.NewSlogLogger()
 
@@ -93,11 +104,11 @@ func TestCreateProductHandler(t *testing.T) {
 		mockQuerier.AssertExpectations(t)
 	})
 
-	t.Run("DB Error", func(t *testing.T) {
+	t.Run(dbErrorTitle, func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
 		handler := handlers.NewHandler(mockQuerier, logger)
 
-		mockQuerier.On("CreateProduct", mock.Anything, mock.AnythingOfType("repository.CreateProductParams")).Return(repository.Product{}, errors.New("db error")).Once()
+		mockQuerier.On("CreateProduct", mock.Anything, mock.AnythingOfType("repository.CreateProductParams")).Return(repository.Product{}, errors.New(dbErrorMsg)).Once()
 
 		req, err := http.NewRequest("POST", productsURL, bytes.NewBuffer(body))
 		assert.NoError(t, err)
@@ -201,11 +212,11 @@ func TestListProductsHandler(t *testing.T) {
 		mockQuerier.AssertExpectations(t)
 	})
 
-	t.Run("DB Error", func(t *testing.T) {
+	t.Run(dbErrorTitle, func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
 		handler := handlers.NewHandler(mockQuerier, logger)
 
-		mockQuerier.On("ListProductsPaginated", mock.Anything, mock.AnythingOfType("repository.ListProductsPaginatedParams")).Return(nil, errors.New("db error")).Once()
+		mockQuerier.On("ListProductsPaginated", mock.Anything, mock.AnythingOfType("repository.ListProductsPaginatedParams")).Return(nil, errors.New(dbErrorMsg)).Once()
 
 		req, err := http.NewRequest("GET", productsURL, nil)
 		assert.NoError(t, err)
@@ -279,6 +290,94 @@ func TestDeleteProductHandler(t *testing.T) {
 		handler.DeleteProductHandler(rr, req)
 
 		assert.Equal(t, http.StatusNoContent, rr.Code)
+		mockQuerier.AssertExpectations(t)
+	})
+}
+
+func TestGetProductsByIDsHandler(t *testing.T) {
+	logger := logs.NewSlogLogger()
+
+	t.Run("Success", func(t *testing.T) {
+		mockQuerier := new(MockQuerier)
+		handler := handlers.NewHandler(mockQuerier, logger)
+
+		uuidStr1 := uuidTest
+		uuidStr2 := "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12"
+		var pgUUID1, pgUUID2 pgtype.UUID
+		_ = pgUUID1.Scan(uuidStr1)
+		_ = pgUUID2.Scan(uuidStr2)
+
+		products := []repository.Product{
+			{ID: pgUUID1, Name: "Product 1"},
+			{ID: pgUUID2, Name: "Product 2"},
+		}
+
+		mockQuerier.On("GetProductsByIDs", mock.Anything, []pgtype.UUID{pgUUID1, pgUUID2}).Return(products, nil).Once()
+
+		req, err := http.NewRequest("GET", apiProductsIdsPath+uuidStr1+","+uuidStr2, nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+		handler.GetProductsByIDsHandler(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		var respProducts []repository.Product
+		err = json.NewDecoder(rr.Body).Decode(&respProducts)
+		assert.NoError(t, err)
+		assert.Equal(t, len(products), len(respProducts))
+		mockQuerier.AssertExpectations(t)
+	})
+
+	t.Run("Empty IDs", func(t *testing.T) {
+		mockQuerier := new(MockQuerier)
+		handler := handlers.NewHandler(mockQuerier, logger)
+
+		req, err := http.NewRequest("GET", apiProductsIdsPath, nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+		handler.GetProductsByIDsHandler(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		var respProducts []repository.Product
+		err = json.NewDecoder(rr.Body).Decode(&respProducts)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(respProducts))
+		mockQuerier.AssertNotCalled(t, "GetProductsByIDs")
+	})
+
+	t.Run("Invalid ID", func(t *testing.T) {
+		mockQuerier := new(MockQuerier)
+		handler := handlers.NewHandler(mockQuerier, logger)
+
+		uuidStr1 := uuidTest
+		req, err := http.NewRequest("GET", apiProductsIdsPath+uuidStr1+",invalid-uuid", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+		handler.GetProductsByIDsHandler(rr, req)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		mockQuerier.AssertNotCalled(t, "GetProductsByIDs", mock.Anything, mock.Anything)
+	})
+
+	t.Run(dbErrorTitle, func(t *testing.T) {
+		mockQuerier := new(MockQuerier)
+		handler := handlers.NewHandler(mockQuerier, logger)
+
+		uuidStr1 := uuidTest
+		var pgUUID1 pgtype.UUID
+		_ = pgUUID1.Scan(uuidStr1)
+
+		mockQuerier.On("GetProductsByIDs", mock.Anything, []pgtype.UUID{pgUUID1}).Return(nil, errors.New(dbErrorMsg)).Once()
+
+		req, err := http.NewRequest("GET", apiProductsIdsPath+uuidStr1, nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+		handler.GetProductsByIDsHandler(rr, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
 		mockQuerier.AssertExpectations(t)
 	})
 }

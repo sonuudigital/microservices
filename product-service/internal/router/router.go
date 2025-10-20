@@ -39,6 +39,7 @@ func registerProductRoutes(mux *http.ServeMux, db db.DB, logger logs.Logger) {
 	h := handlers.NewHandler(queries, logger)
 
 	mux.HandleFunc("POST /api/products", h.CreateProductHandler)
+	mux.HandleFunc("GET /api/products/ids", h.GetProductsByIDsHandler)
 	mux.HandleFunc("GET /api/products/{id}", h.GetProductHandler)
 	mux.HandleFunc("GET /api/products", h.ListProductsHandler)
 	mux.HandleFunc("PUT /api/products/{id}", h.UpdateProductHandler)

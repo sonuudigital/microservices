@@ -35,3 +35,7 @@ RETURNING *;
 -- name: DeleteProduct :exec
 DELETE FROM products
 WHERE id = $1;
+
+-- name: GetProductsByIDs :many
+SELECT * FROM products
+WHERE id = ANY(@product_ids::uuid[]);

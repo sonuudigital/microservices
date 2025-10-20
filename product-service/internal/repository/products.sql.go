@@ -85,6 +85,40 @@ func (q *Queries) GetProduct(ctx context.Context, id pgtype.UUID) (Product, erro
 	return i, err
 }
 
+const getProductsByIDs = `-- name: GetProductsByIDs :many
+SELECT id, name, description, code, price, created_at, stock_quantity, updated_at FROM products
+WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) GetProductsByIDs(ctx context.Context, productIds []pgtype.UUID) ([]Product, error) {
+	rows, err := q.db.Query(ctx, getProductsByIDs, productIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Product
+	for rows.Next() {
+		var i Product
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Code,
+			&i.Price,
+			&i.CreatedAt,
+			&i.StockQuantity,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProductsPaginated = `-- name: ListProductsPaginated :many
 SELECT id, name, description, code, price, created_at, stock_quantity, updated_at FROM products
 ORDER BY name
