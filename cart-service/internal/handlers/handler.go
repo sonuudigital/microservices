@@ -13,8 +13,14 @@ import (
 )
 
 const (
-	invalidUserIDErrorMsg = "invalid user id"
+	invalidUserIDErrorMsg              = "invalid user id"
+	userValidationErrorTitleMsg        = "Error validating user existence"
+	userValidationErrorMsg             = "error validating user existence"
+	userDoesNotExistErrorTitleMsg      = "User Does Not Exist"
+	userDoesNotExistErrorMsg           = "user does not exist"
+	specifiedUserDoesNotExistsErrorMsg = "The specified user does not exist"
 
+	cartNotFoundErrorTitleMsg  = "Cart Not Found"
 	cartNotFoundErrorMsg       = "cart not found"
 	multipleCartsFoundErrorMsg = "multiple carts found for user"
 	failedGetCartErrorMsg      = "failed to get cart by user id"
@@ -27,15 +33,15 @@ type UserValidator interface {
 	ValidateUserExists(ctx context.Context, userID string) (bool, error)
 }
 
+type ProductFetcher interface {
+	GetProductsByIDs(ctx context.Context, ids []string) (map[string]ProductByIDResponse, error)
+}
+
 type ProductByIDResponse struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	Price       float64 `json:"price"`
-}
-
-type ProductFetcher interface {
-	GetProductsByIDs(ctx context.Context, ids []string) (map[string]ProductByIDResponse, error)
 }
 
 type Handler struct {
@@ -102,13 +108,13 @@ func (h *Handler) GetCartByUserIDHandler(w http.ResponseWriter, r *http.Request)
 
 	userExists, err := h.userValidator.ValidateUserExists(ctx, userID)
 	if err != nil {
-		h.logger.Error("error validating user existence", "error", err, "user_id", userID)
-		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Error validating user existence")
+		h.logger.Error(userValidationErrorMsg, "error", err, "user_id", userID)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, userValidationErrorTitleMsg)
 		return
 	}
 	if !userExists {
-		h.logger.Warn("user does not exist", "user_id", userID)
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "User Does Not Exist", "The specified user does not exist")
+		h.logger.Warn(userDoesNotExistErrorMsg, "user_id", userID)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, userDoesNotExistErrorTitleMsg, specifiedUserDoesNotExistsErrorMsg)
 		return
 	}
 
@@ -117,7 +123,7 @@ func (h *Handler) GetCartByUserIDHandler(w http.ResponseWriter, r *http.Request)
 		switch err {
 		case pgx.ErrNoRows:
 			h.logger.Error(cartNotFoundErrorMsg, "user_id", userID)
-			web.RespondWithError(w, h.logger, r, http.StatusNotFound, "Cart Not Found", cartNotFoundErrorMsg)
+			web.RespondWithError(w, h.logger, r, http.StatusNotFound, cartNotFoundErrorTitleMsg, cartNotFoundErrorMsg)
 			return
 		case pgx.ErrTooManyRows:
 			h.logger.Error(multipleCartsFoundErrorMsg, "user_id", userID)
@@ -203,13 +209,13 @@ func (h *Handler) CreateCartHandler(w http.ResponseWriter, r *http.Request) {
 
 	userExists, err := h.userValidator.ValidateUserExists(ctx, req.UserID)
 	if err != nil {
-		h.logger.Error("error validating user existence", "error", err, "user_id", req.UserID)
-		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Error validating user existence")
+		h.logger.Error(userValidationErrorMsg, "error", err, "user_id", req.UserID)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, userValidationErrorTitleMsg)
 		return
 	}
 	if !userExists {
-		h.logger.Warn("user does not exist", "user_id", req.UserID)
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "User Does Not Exist", "The specified user does not exist")
+		h.logger.Warn(userDoesNotExistErrorMsg, "user_id", req.UserID)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, userDoesNotExistErrorTitleMsg, specifiedUserDoesNotExistsErrorMsg)
 		return
 	}
 
@@ -230,7 +236,7 @@ func (h *Handler) CreateCartHandler(w http.ResponseWriter, r *http.Request) {
 		switch err {
 		case pgx.ErrNoRows:
 			h.logger.Error(cartNotFoundErrorMsg, "user_id", userID)
-			web.RespondWithError(w, h.logger, r, http.StatusNotFound, "Cart Not Found", cartNotFoundErrorMsg)
+			web.RespondWithError(w, h.logger, r, http.StatusNotFound, cartNotFoundErrorTitleMsg, cartNotFoundErrorMsg)
 			return
 		case pgx.ErrTooManyRows:
 			h.logger.Error(multipleCartsFoundErrorMsg, "user_id", userID)
@@ -244,4 +250,45 @@ func (h *Handler) CreateCartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	web.RespondWithJSON(w, h.logger, http.StatusCreated, newCartResponse(cart))
+}
+
+func (h *Handler) DeleteCartByUserIDHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if !web.CheckContext(ctx, h.logger) {
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
+		return
+	}
+
+	userID := r.PathValue("id")
+	var uid pgtype.UUID
+	if err := uid.Scan(userID); err != nil {
+		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid User ID", invalidUserIDErrorMsg)
+		return
+	}
+
+	userExists, err := h.userValidator.ValidateUserExists(ctx, userID)
+	if err != nil {
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, userValidationErrorTitleMsg)
+		return
+	}
+	if !userExists {
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, userDoesNotExistErrorTitleMsg, specifiedUserDoesNotExistsErrorMsg)
+		return
+	}
+
+	if err := h.queries.DeleteCartByUserID(ctx, uid); err != nil {
+		switch err {
+		case pgx.ErrNoRows:
+			h.logger.Warn(cartNotFoundErrorMsg, "user_id", userID)
+			web.RespondWithError(w, h.logger, r, http.StatusNotFound, cartNotFoundErrorTitleMsg, cartNotFoundErrorMsg)
+			return
+		default:
+			h.logger.Error("failed to delete cart by user id", "error", err, "user_id", userID)
+			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to delete cart")
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

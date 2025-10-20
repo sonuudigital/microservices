@@ -24,6 +24,16 @@ func (q *Queries) CreateCart(ctx context.Context, userID pgtype.UUID) (Cart, err
 	return i, err
 }
 
+const deleteCartByUserID = `-- name: DeleteCartByUserID :exec
+DELETE FROM carts
+WHERE user_id = $1
+`
+
+func (q *Queries) DeleteCartByUserID(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteCartByUserID, userID)
+	return err
+}
+
 const getCartByUserID = `-- name: GetCartByUserID :one
 SELECT id, user_id, created_at FROM carts
 WHERE user_id = $1

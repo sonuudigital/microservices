@@ -43,6 +43,11 @@ func (m *MockQuerier) CreateCart(ctx context.Context, userID pgtype.UUID) (repos
 	return repository.Cart{}, args.Error(1)
 }
 
+func (m *MockQuerier) DeleteCartByUserID(ctx context.Context, userID pgtype.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
 func (m *MockQuerier) GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUID) ([]repository.GetCartProductsByCartIDRow, error) {
 	args := m.Called(ctx, cartID)
 	if c, ok := args.Get(0).([]repository.GetCartProductsByCartIDRow); ok {
