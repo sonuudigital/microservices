@@ -51,7 +51,7 @@ func TestAuthMiddleware(t *testing.T) {
 	handlerToTest := middleware(mockNextHandler)
 
 	t.Run("Valid Token", func(t *testing.T) {
-		token, err := jwtManager.GenerateToken("test@example.com")
+		token, err := jwtManager.GenerateToken("user-123", "test@example.com")
 		assert.NoError(t, err)
 
 		req, _ := http.NewRequest("GET", protectedURL, nil)
@@ -108,7 +108,7 @@ func TestAuthMiddleware(t *testing.T) {
 	t.Run("Expired Token", func(t *testing.T) {
 		shortLivedJwtManager, err := auth.NewJWTManager(privKeyPem, pubKeyPem, "test-issuer", "test-audience", -1*time.Minute)
 		assert.NoError(t, err)
-		token, err := shortLivedJwtManager.GenerateToken("test@example.com")
+		token, err := shortLivedJwtManager.GenerateToken("user-123", "test@example.com")
 		assert.NoError(t, err)
 
 		req, _ := http.NewRequest("GET", protectedURL, nil)
