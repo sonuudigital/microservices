@@ -9,7 +9,7 @@ import (
 	"github.com/sonuudigital/microservices/shared/logs"
 )
 
-func ConfigRoutes(db db.DB, userClient handlers.UserValidator, productFetcher handlers.ProductFetcher, logger logs.Logger) *http.ServeMux {
+func ConfigRoutes(db db.DB, productFetcher handlers.ProductFetcher, logger logs.Logger) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -25,18 +25,18 @@ func ConfigRoutes(db db.DB, userClient handlers.UserValidator, productFetcher ha
 		_, _ = w.Write([]byte("ready"))
 	})
 
-	registerCartRoutes(mux, db, userClient, productFetcher, logger)
+	registerCartRoutes(mux, db, productFetcher, logger)
 
 	return mux
 }
 
-func registerCartRoutes(mux *http.ServeMux, db db.DB, userClient handlers.UserValidator, productFetcher handlers.ProductFetcher, logger logs.Logger) {
+func registerCartRoutes(mux *http.ServeMux, db db.DB, productFetcher handlers.ProductFetcher, logger logs.Logger) {
 	queries := repository.New(db)
-	h := handlers.NewHandler(queries, userClient, productFetcher, logger)
+	h := handlers.NewHandler(queries, productFetcher, logger)
 
-	mux.HandleFunc("GET /api/carts/{userId}", h.GetCartByUserIDHandler)
-	mux.HandleFunc("DELETE /api/carts/{userId}", h.DeleteCartByUserIDHandler)
-	mux.HandleFunc("POST /api/carts/{userId}/products", h.AddProductToCartHandler)
-	mux.HandleFunc("DELETE /api/carts/{userId}/products/{productId}", h.RemoveProductFromCartHandler)
-	mux.HandleFunc("DELETE /api/carts/{userId}/products", h.ClearCartProductsByUserIDHandler)
+	mux.HandleFunc("GET /api/carts", h.GetCartHandler)
+	mux.HandleFunc("DELETE /api/carts", h.DeleteCartHandler)
+	mux.HandleFunc("POST /api/carts/products", h.AddProductToCartHandler)
+	mux.HandleFunc("DELETE /api/carts/products/{productId}", h.RemoveProductFromCartHandler)
+	mux.HandleFunc("DELETE /api/carts/products", h.ClearCartHandler)
 }
