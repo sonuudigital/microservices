@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	AddOrUpdateProductInCart(ctx context.Context, arg AddOrUpdateProductInCartParams) (CartsProduct, error)
 	CreateCart(ctx context.Context, userID pgtype.UUID) (Cart, error)
 	DeleteCartByUserID(ctx context.Context, userID pgtype.UUID) error
 	GetCartByUserID(ctx context.Context, userID pgtype.UUID) (Cart, error)

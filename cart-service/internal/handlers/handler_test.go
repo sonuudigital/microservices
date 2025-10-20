@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -19,12 +20,27 @@ import (
 )
 
 const (
-	uuidTest = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-	cartsURL = "/api/carts"
+	uuidTest            = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+	cartUUIDTest        = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12"
+	cartsURL            = "/api/carts"
+	productIDTest       = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13"
+	testProductTitleMsg = "Test Product"
+	invalidUUIDPathTest = "invalid-uuid"
+	networkErrorMsg     = "network error"
+	dbErrorMsg          = "db error"
+	productsPath        = "/products"
 )
 
 type MockQuerier struct {
 	mock.Mock
+}
+
+func (m *MockQuerier) AddOrUpdateProductInCart(ctx context.Context, arg repository.AddOrUpdateProductInCartParams) (repository.CartsProduct, error) {
+	args := m.Called(ctx, arg)
+	if c, ok := args.Get(0).(repository.CartsProduct); ok {
+		return c, args.Error(1)
+	}
+	return repository.CartsProduct{}, args.Error(1)
 }
 
 func (m *MockQuerier) GetCartByUserID(ctx context.Context, userID pgtype.UUID) (repository.Cart, error) {
@@ -98,7 +114,7 @@ func testGetCartByUserIDSuccess(t *testing.T) {
 
 	var userUUID, cartUUID, product1UUID, product2UUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
-	_ = cartUUID.Scan("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12")
+	_ = cartUUID.Scan(cartUUIDTest)
 	_ = product1UUID.Scan("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13")
 	_ = product2UUID.Scan("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14")
 
@@ -190,7 +206,7 @@ func testGetCartByUserIDInvalidID(t *testing.T) {
 	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
 
 	req, _ := http.NewRequest("GET", cartsURL+"/invalid-uuid", nil)
-	req.SetPathValue("id", "invalid-uuid")
+	req.SetPathValue("id", invalidUUIDPathTest)
 	rr := httptest.NewRecorder()
 
 	handler.GetCartByUserIDHandler(rr, req)
@@ -264,7 +280,7 @@ func testCreateCartUserValidationFails(t *testing.T) {
 	logger := logs.NewSlogLogger()
 	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, errors.New("network error")).Once()
+	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, errors.New(networkErrorMsg)).Once()
 
 	cartReq := handlers.CartRequest{UserID: uuidTest}
 	body, _ := json.Marshal(cartReq)
@@ -290,7 +306,7 @@ func testCreateCartDBError(t *testing.T) {
 
 	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
 	mockQuerier.On("GetCartByUserID", mock.Anything, pgUUID).Return(repository.Cart{}, pgx.ErrNoRows).Once()
-	mockQuerier.On("CreateCart", mock.Anything, pgUUID).Return(repository.Cart{}, errors.New("db error")).Once()
+	mockQuerier.On("CreateCart", mock.Anything, pgUUID).Return(repository.Cart{}, errors.New(dbErrorMsg)).Once()
 
 	cartReq := handlers.CartRequest{UserID: uuidTest}
 	body, _ := json.Marshal(cartReq)
@@ -379,7 +395,7 @@ func testDeleteCartByUserIDUserValidationFails(t *testing.T) {
 	logger := logs.NewSlogLogger()
 	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
 
-	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, errors.New("network error")).Once()
+	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(false, errors.New(networkErrorMsg)).Once()
 
 	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest, nil)
 	req.SetPathValue("id", uuidTest)
@@ -427,7 +443,7 @@ func testDeleteCartByUserIDDBError(t *testing.T) {
 	_ = pgUUID.Scan(uuidTest)
 
 	mockUserValidator.On("ValidateUserExists", mock.Anything, uuidTest).Return(true, nil).Once()
-	mockQuerier.On("DeleteCartByUserID", mock.Anything, pgUUID).Return(errors.New("db error")).Once()
+	mockQuerier.On("DeleteCartByUserID", mock.Anything, pgUUID).Return(errors.New(dbErrorMsg)).Once()
 
 	req, _ := http.NewRequest("DELETE", cartsURL+"/"+uuidTest, nil)
 	req.SetPathValue("id", uuidTest)
@@ -448,7 +464,7 @@ func testDeleteCartByUserIDInvalidID(t *testing.T) {
 	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
 
 	req, _ := http.NewRequest("DELETE", cartsURL+"/invalid-uuid", nil)
-	req.SetPathValue("id", "invalid-uuid")
+	req.SetPathValue("id", invalidUUIDPathTest)
 	rr := httptest.NewRecorder()
 
 	handler.DeleteCartByUserIDHandler(rr, req)
@@ -456,4 +472,253 @@ func testDeleteCartByUserIDInvalidID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	mockQuerier.AssertNotCalled(t, "DeleteCartByUserID", mock.Anything, mock.Anything)
 	mockUserValidator.AssertNotCalled(t, "ValidateUserExists", mock.Anything, mock.Anything)
+}
+
+func TestAddProductToCartHandler(t *testing.T) {
+	t.Run("Success new cart", testAddProductToCartSuccessNewCart)
+	t.Run("Success existing cart", testAddProductToCartSuccessExistingCart)
+	t.Run("Invalid user ID", testAddProductToCartInvalidUserID)
+	t.Run("Invalid request body", testAddProductToCartInvalidRequestBody)
+	t.Run("Product not found", testAddProductToCartProductNotFound)
+	t.Run("Product fetcher error", testAddProductToCartProductFetcherError)
+	t.Run("DB error on add", testAddProductToCartDBErrorOnAdd)
+}
+
+func testAddProductToCartSuccessNewCart(t *testing.T) {
+	mockQuerier := new(MockQuerier)
+	mockUserValidator := new(MockUserValidator)
+	mockProductFetcher := new(MockProductFetcher)
+	logger := logs.NewSlogLogger()
+	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+
+	var userUUID, cartUUID, productUUID pgtype.UUID
+	_ = userUUID.Scan(uuidTest)
+	_ = cartUUID.Scan(cartUUIDTest)
+	_ = productUUID.Scan(productIDTest)
+
+	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{}, pgx.ErrNoRows).Once()
+	mockQuerier.On("CreateCart", mock.Anything, userUUID).Return(repository.Cart{ID: cartUUID, UserID: userUUID}, nil).Once()
+
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
+		productIDTest: {ID: productIDTest, Name: testProductTitleMsg, Price: 99.99},
+	}, nil).Once()
+
+	priceNumeric := pgtype.Numeric{}
+	_ = priceNumeric.Scan("99.99")
+	params := repository.AddOrUpdateProductInCartParams{
+		CartID:    cartUUID,
+		ProductID: productUUID,
+		Quantity:  1,
+		Price:     priceNumeric,
+	}
+	expectedProduct := repository.CartsProduct{
+		ID:        pgtype.UUID{Bytes: [16]byte{1}, Valid: true},
+		CartID:    cartUUID,
+		ProductID: productUUID,
+		Quantity:  1,
+		Price:     priceNumeric,
+		AddedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+	mockQuerier.On("AddOrUpdateProductInCart", mock.Anything, params).Return(expectedProduct, nil).Once()
+
+	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
+	body, _ := json.Marshal(addProductReq)
+	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
+	req.SetPathValue("id", uuidTest)
+	rr := httptest.NewRecorder()
+
+	handler.AddProductToCartHandler(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	var resp handlers.AddProductResponse
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	assert.NoError(t, err)
+	assert.Equal(t, productIDTest, resp.ProductID)
+	assert.Equal(t, int32(1), resp.Quantity)
+
+	mockQuerier.AssertExpectations(t)
+	mockProductFetcher.AssertExpectations(t)
+}
+
+func testAddProductToCartSuccessExistingCart(t *testing.T) {
+	mockQuerier := new(MockQuerier)
+	mockUserValidator := new(MockUserValidator)
+	mockProductFetcher := new(MockProductFetcher)
+	logger := logs.NewSlogLogger()
+	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+
+	var userUUID, cartUUID, productUUID pgtype.UUID
+	_ = userUUID.Scan(uuidTest)
+	_ = cartUUID.Scan(cartUUIDTest)
+	_ = productUUID.Scan(productIDTest)
+
+	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{ID: cartUUID, UserID: userUUID}, nil).Once()
+
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
+		productIDTest: {ID: productIDTest, Name: testProductTitleMsg, Price: 99.99},
+	}, nil).Once()
+
+	priceNumeric := pgtype.Numeric{}
+	_ = priceNumeric.Scan("99.99")
+	params := repository.AddOrUpdateProductInCartParams{
+		CartID:    cartUUID,
+		ProductID: productUUID,
+		Quantity:  2,
+		Price:     priceNumeric,
+	}
+	expectedProduct := repository.CartsProduct{
+		ID:        pgtype.UUID{Bytes: [16]byte{1}, Valid: true},
+		CartID:    cartUUID,
+		ProductID: productUUID,
+		Quantity:  2,
+		Price:     priceNumeric,
+		AddedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+	mockQuerier.On("AddOrUpdateProductInCart", mock.Anything, params).Return(expectedProduct, nil).Once()
+
+	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 2}
+	body, _ := json.Marshal(addProductReq)
+	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
+	req.SetPathValue("id", uuidTest)
+	rr := httptest.NewRecorder()
+
+	handler.AddProductToCartHandler(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	var resp handlers.AddProductResponse
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	assert.NoError(t, err)
+	assert.Equal(t, productIDTest, resp.ProductID)
+	assert.Equal(t, int32(2), resp.Quantity)
+
+	mockQuerier.AssertExpectations(t)
+	mockProductFetcher.AssertExpectations(t)
+}
+
+func testAddProductToCartInvalidUserID(t *testing.T) {
+	mockQuerier := new(MockQuerier)
+	mockUserValidator := new(MockUserValidator)
+	mockProductFetcher := new(MockProductFetcher)
+	logger := logs.NewSlogLogger()
+	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+
+	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
+	body, _ := json.Marshal(addProductReq)
+	req, _ := http.NewRequest("POST", cartsURL+"/invalid-uuid/products", bytes.NewBuffer(body))
+	req.SetPathValue("id", invalidUUIDPathTest)
+	rr := httptest.NewRecorder()
+
+	handler.AddProductToCartHandler(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func testAddProductToCartInvalidRequestBody(t *testing.T) {
+	mockQuerier := new(MockQuerier)
+	mockUserValidator := new(MockUserValidator)
+	mockProductFetcher := new(MockProductFetcher)
+	logger := logs.NewSlogLogger()
+	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+
+	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBufferString("{invalid-json}"))
+	req.SetPathValue("id", uuidTest)
+	rr := httptest.NewRecorder()
+
+	handler.AddProductToCartHandler(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func testAddProductToCartProductNotFound(t *testing.T) {
+	mockQuerier := new(MockQuerier)
+	mockUserValidator := new(MockUserValidator)
+	mockProductFetcher := new(MockProductFetcher)
+	logger := logs.NewSlogLogger()
+	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+
+	var userUUID, cartUUID pgtype.UUID
+	_ = userUUID.Scan(uuidTest)
+	_ = cartUUID.Scan(cartUUIDTest)
+
+	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{ID: cartUUID, UserID: userUUID}, nil).Once()
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{}, nil).Once()
+
+	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
+	body, _ := json.Marshal(addProductReq)
+	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
+	req.SetPathValue("id", uuidTest)
+	rr := httptest.NewRecorder()
+
+	handler.AddProductToCartHandler(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	mockQuerier.AssertExpectations(t)
+	mockProductFetcher.AssertExpectations(t)
+}
+
+func testAddProductToCartProductFetcherError(t *testing.T) {
+	mockQuerier := new(MockQuerier)
+	mockUserValidator := new(MockUserValidator)
+	mockProductFetcher := new(MockProductFetcher)
+	logger := logs.NewSlogLogger()
+	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+
+	var userUUID, cartUUID pgtype.UUID
+	_ = userUUID.Scan(uuidTest)
+	_ = cartUUID.Scan(cartUUIDTest)
+
+	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{ID: cartUUID, UserID: userUUID}, nil).Once()
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(nil, errors.New(networkErrorMsg)).Once()
+
+	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
+	body, _ := json.Marshal(addProductReq)
+	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
+	req.SetPathValue("id", uuidTest)
+	rr := httptest.NewRecorder()
+
+	handler.AddProductToCartHandler(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	mockQuerier.AssertExpectations(t)
+	mockProductFetcher.AssertExpectations(t)
+}
+
+func testAddProductToCartDBErrorOnAdd(t *testing.T) {
+	mockQuerier := new(MockQuerier)
+	mockUserValidator := new(MockUserValidator)
+	mockProductFetcher := new(MockProductFetcher)
+	logger := logs.NewSlogLogger()
+	handler := handlers.NewHandler(mockQuerier, mockUserValidator, mockProductFetcher, logger)
+
+	var userUUID, cartUUID, productUUID pgtype.UUID
+	_ = userUUID.Scan(uuidTest)
+	_ = cartUUID.Scan(cartUUIDTest)
+	_ = productUUID.Scan(productIDTest)
+
+	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{ID: cartUUID, UserID: userUUID}, nil).Once()
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
+		productIDTest: {ID: productIDTest, Name: testProductTitleMsg, Price: 99.99},
+	}, nil).Once()
+
+	priceNumeric := pgtype.Numeric{}
+	_ = priceNumeric.Scan("99.99")
+	params := repository.AddOrUpdateProductInCartParams{
+		CartID:    cartUUID,
+		ProductID: productUUID,
+		Quantity:  1,
+		Price:     priceNumeric,
+	}
+	mockQuerier.On("AddOrUpdateProductInCart", mock.Anything, params).Return(repository.CartsProduct{}, errors.New(dbErrorMsg)).Once()
+
+	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
+	body, _ := json.Marshal(addProductReq)
+	req, _ := http.NewRequest("POST", cartsURL+"/"+uuidTest+productsPath, bytes.NewBuffer(body))
+	req.SetPathValue("id", uuidTest)
+	rr := httptest.NewRecorder()
+
+	handler.AddProductToCartHandler(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	mockQuerier.AssertExpectations(t)
+	mockProductFetcher.AssertExpectations(t)
 }

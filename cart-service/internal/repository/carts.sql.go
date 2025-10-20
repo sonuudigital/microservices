@@ -11,6 +11,42 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addOrUpdateProductInCart = `-- name: AddOrUpdateProductInCart :one
+INSERT INTO carts_products (cart_id, product_id, quantity, price)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (cart_id, product_id)
+DO UPDATE SET
+    quantity = carts_products.quantity + $3,
+    price = EXCLUDED.price
+RETURNING id, cart_id, product_id, quantity, price, added_at
+`
+
+type AddOrUpdateProductInCartParams struct {
+	CartID    pgtype.UUID    `json:"cartId"`
+	ProductID pgtype.UUID    `json:"productId"`
+	Quantity  int32          `json:"quantity"`
+	Price     pgtype.Numeric `json:"price"`
+}
+
+func (q *Queries) AddOrUpdateProductInCart(ctx context.Context, arg AddOrUpdateProductInCartParams) (CartsProduct, error) {
+	row := q.db.QueryRow(ctx, addOrUpdateProductInCart,
+		arg.CartID,
+		arg.ProductID,
+		arg.Quantity,
+		arg.Price,
+	)
+	var i CartsProduct
+	err := row.Scan(
+		&i.ID,
+		&i.CartID,
+		&i.ProductID,
+		&i.Quantity,
+		&i.Price,
+		&i.AddedAt,
+	)
+	return i, err
+}
+
 const createCart = `-- name: CreateCart :one
 INSERT INTO carts (user_id)
 VALUES ($1)
