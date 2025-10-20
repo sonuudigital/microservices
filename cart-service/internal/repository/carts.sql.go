@@ -47,6 +47,20 @@ func (q *Queries) AddOrUpdateProductInCart(ctx context.Context, arg AddOrUpdateP
 	return i, err
 }
 
+const clearCartProductsByUserID = `-- name: ClearCartProductsByUserID :exec
+DELETE FROM carts_products
+WHERE cart_id = (
+    SELECT id
+    FROM carts
+    WHERE user_id = $1
+)
+`
+
+func (q *Queries) ClearCartProductsByUserID(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, clearCartProductsByUserID, userID)
+	return err
+}
+
 const createCart = `-- name: CreateCart :one
 INSERT INTO carts (user_id)
 VALUES ($1)
@@ -115,7 +129,12 @@ func (q *Queries) GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUI
 
 const removeProductFromCart = `-- name: RemoveProductFromCart :exec
 DELETE FROM carts_products
-WHERE cart_id = (SELECT id FROM carts WHERE user_id = $1) AND product_id = $2
+WHERE cart_id = (
+    SELECT id
+    FROM carts
+    WHERE user_id = $1
+)
+AND product_id = $2
 `
 
 type RemoveProductFromCartParams struct {

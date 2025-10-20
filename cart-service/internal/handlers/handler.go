@@ -397,3 +397,38 @@ func (h *Handler) RemoveProductFromCartHandler(w http.ResponseWriter, r *http.Re
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *Handler) ClearCartProductsByUserIDHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if !web.CheckContext(ctx, h.logger) {
+		web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, requestTimeoutTitleMsg, web.ReqCancelledMsg)
+		return
+	}
+
+	userID := r.PathValue("userId")
+	var userUUID pgtype.UUID
+	if err := userUUID.Scan(userID); err != nil {
+		h.logger.Warn(invalidUserIDErrorMsg, "error", err)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidUserIDErrorTitleMsg, invalidUserIDErrorMsg)
+		return
+	}
+
+	userExists, err := h.userValidator.ValidateUserExists(ctx, userID)
+	if err != nil {
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, userValidationErrorTitleMsg)
+		return
+	}
+	if !userExists {
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, userDoesNotExistErrorTitleMsg, specifiedUserDoesNotExistsErrorMsg)
+		return
+	}
+
+	err = h.queries.ClearCartProductsByUserID(ctx, userUUID)
+	if err != nil {
+		h.logger.Error("failed to clear cart products by user id", "error", err, "user_id", userID)
+		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, internalServerErrorTitleMsg, "Failed to clear cart products")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
