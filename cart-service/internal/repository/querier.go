@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	CreateCart(ctx context.Context, userID pgtype.UUID) (Cart, error)
+	DeleteCartByUserID(ctx context.Context, userID pgtype.UUID) error
 	GetCartByUserID(ctx context.Context, userID pgtype.UUID) (Cart, error)
 	GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUID) ([]GetCartProductsByCartIDRow, error)
 }

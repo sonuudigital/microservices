@@ -36,4 +36,5 @@ func registerCartRoutes(mux *http.ServeMux, db db.DB, userClient handlers.UserVa
 
 	mux.HandleFunc("GET /api/carts/{id}", h.GetCartByUserIDHandler)
 	mux.HandleFunc("POST /api/carts", h.CreateCartHandler)
+	mux.HandleFunc("DELETE /api/carts/{id}", h.DeleteCartByUserIDHandler)
 }
