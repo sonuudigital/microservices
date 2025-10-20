@@ -14,6 +14,7 @@ type Querier interface {
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	DeleteProduct(ctx context.Context, id pgtype.UUID) error
 	GetProduct(ctx context.Context, id pgtype.UUID) (Product, error)
+	GetProductsByIDs(ctx context.Context, productIds []pgtype.UUID) ([]Product, error)
 	ListProductsPaginated(ctx context.Context, arg ListProductsPaginatedParams) ([]Product, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 }
