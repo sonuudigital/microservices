@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/sonuudigital/microservices/cart-service/internal/clients"
 	"github.com/sonuudigital/microservices/cart-service/internal/handlers"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/logs"
@@ -94,9 +95,9 @@ type MockProductFetcher struct {
 	mock.Mock
 }
 
-func (m *MockProductFetcher) GetProductsByIDs(ctx context.Context, ids []string) (map[string]handlers.ProductByIDResponse, error) {
+func (m *MockProductFetcher) GetProductsByIDs(ctx context.Context, ids []string) (map[string]clients.ProductByIDResponse, error) {
 	args := m.Called(ctx, ids)
-	if c, ok := args.Get(0).(map[string]handlers.ProductByIDResponse); ok {
+	if c, ok := args.Get(0).(map[string]clients.ProductByIDResponse); ok {
 		return c, args.Error(1)
 	}
 	return nil, args.Error(1)
@@ -130,7 +131,7 @@ func testGetCartSuccess(t *testing.T) {
 	mockQuerier.On("GetCartProductsByCartID", mock.Anything, cartUUID).Return(cartItems, nil).Once()
 
 	productIDs := []string{product1UUID.String(), product2UUID.String()}
-	fetchedProducts := map[string]handlers.ProductByIDResponse{
+	fetchedProducts := map[string]clients.ProductByIDResponse{
 		product1UUID.String(): {ID: product1UUID.String(), Name: "Product 1", Price: 10.00},
 		product2UUID.String(): {ID: product2UUID.String(), Name: "Product 2", Price: 5.50},
 	}
@@ -275,7 +276,7 @@ func testAddProductToCartSuccessNewCart(t *testing.T) {
 	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{}, pgx.ErrNoRows).Once()
 	mockQuerier.On("CreateCart", mock.Anything, userUUID).Return(repository.Cart{ID: cartUUID, UserID: userUUID}, nil).Once()
 
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{
 		productIDTest: {ID: productIDTest, Name: testProductTitleMsg, Price: 99.99},
 	}, nil).Once()
 
@@ -329,7 +330,7 @@ func testAddProductToCartSuccessExistingCart(t *testing.T) {
 
 	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{ID: cartUUID, UserID: userUUID}, nil).Once()
 
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{
 		productIDTest: {ID: productIDTest, Name: testProductTitleMsg, Price: 99.99},
 	}, nil).Once()
 
@@ -413,7 +414,7 @@ func testAddProductToCartProductNotFound(t *testing.T) {
 	_ = cartUUID.Scan(cartUUIDTest)
 
 	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{ID: cartUUID, UserID: userUUID}, nil).Once()
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{}, nil).Once()
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{}, nil).Once()
 
 	addProductReq := handlers.AddProductRequest{ProductID: productIDTest, Quantity: 1}
 	body, _ := json.Marshal(addProductReq)
@@ -466,7 +467,7 @@ func testAddProductToCartDBErrorOnAdd(t *testing.T) {
 	_ = productUUID.Scan(productIDTest)
 
 	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{ID: cartUUID, UserID: userUUID}, nil).Once()
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{
 		productIDTest: {ID: productIDTest, Name: testProductTitleMsg, Price: 99.99},
 	}, nil).Once()
 
@@ -512,7 +513,7 @@ func testRemoveProductFromCartSuccess(t *testing.T) {
 	_ = userUUID.Scan(uuidTest)
 	_ = productUUID.Scan(productIDTest)
 
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{
 		productIDTest: {ID: productIDTest},
 	}, nil).Once()
 	mockQuerier.On("RemoveProductFromCart", mock.Anything, repository.RemoveProductFromCartParams{
@@ -570,7 +571,7 @@ func testRemoveProductFromCartProductNotFound(t *testing.T) {
 	logger := logs.NewSlogLogger()
 	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{}, nil).Once()
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{}, nil).Once()
 
 	req, _ := http.NewRequest("DELETE", cartsURL+productsIDPath, nil)
 	req.Header.Set(userIDHeader, uuidTest)
@@ -614,7 +615,7 @@ func testRemoveProductFromCartDBError(t *testing.T) {
 	_ = userUUID.Scan(uuidTest)
 	_ = productUUID.Scan(productIDTest)
 
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{
 		productIDTest: {ID: productIDTest},
 	}, nil).Once()
 	mockQuerier.On("RemoveProductFromCart", mock.Anything, repository.RemoveProductFromCartParams{

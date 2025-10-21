@@ -59,7 +59,7 @@ The project includes both unit and integration tests to ensure the reliability o
 2.  Execute the tests from the `tests` directory:
     ```bash
     cd tests
-    API_GATEWAY_URL=http://localhost:8080 go test -v ./integration
+    GOWORK=off API_GATEWAY_URL=http://localhost:8080 go test -v ./integration
     ```
 
 ## License
