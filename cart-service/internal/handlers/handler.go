@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/sonuudigital/microservices/cart-service/internal/clients"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/web"
@@ -17,7 +18,11 @@ const (
 	invalidUserIDErrorTitleMsg = "Invalid User ID"
 	invalidUserIDErrorMsg      = "invalid user id"
 
-	invalidProductIDErrorMsg = "invalid product id"
+	invalidProductIDErrorMsg      = "invalid product id"
+	invalidProductIDErrorTitleMsg = "Invalid Product ID"
+
+	productNotFoundErrorTitleMsg = "Product Not Found"
+	productNotFoundErrorMsg      = "The specified product does not exist"
 
 	cartNotFoundErrorTitleMsg  = "Cart Not Found"
 	cartNotFoundErrorMsg       = "cart not found"
@@ -30,14 +35,7 @@ const (
 )
 
 type ProductFetcher interface {
-	GetProductsByIDs(ctx context.Context, ids []string) (map[string]ProductByIDResponse, error)
-}
-
-type ProductByIDResponse struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
+	GetProductsByIDs(ctx context.Context, ids []string) (map[string]clients.ProductByIDResponse, error)
 }
 
 type Handler struct {
@@ -246,6 +244,19 @@ func (h *Handler) AddProductToCartHandler(w http.ResponseWriter, r *http.Request
 
 	productsMap, err := h.productFetcher.GetProductsByIDs(ctx, []string{req.ProductID})
 	if err != nil {
+		if pce, ok := err.(*clients.ProductClientError); ok {
+			switch pce.StatusCode {
+			case http.StatusBadRequest:
+				h.logger.Warn("invalid product ID format", "product_id", req.ProductID, "error", err)
+				web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidProductIDErrorTitleMsg, "The product ID format is invalid")
+				return
+			case http.StatusNotFound:
+				h.logger.Warn("product not found in product service", "product_id", req.ProductID)
+				web.RespondWithError(w, h.logger, r, http.StatusNotFound, productNotFoundErrorTitleMsg, productNotFoundErrorMsg)
+				return
+			}
+		}
+		h.logger.Error("failed to fetch product details", "error", err, "product_id", req.ProductID)
 		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, "Product Fetch Failed", "Could not retrieve product details")
 		return
 	}
@@ -253,14 +264,14 @@ func (h *Handler) AddProductToCartHandler(w http.ResponseWriter, r *http.Request
 	product, exists := productsMap[req.ProductID]
 	if !exists {
 		h.logger.Warn("product not found", "product_id", req.ProductID)
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Product Not Found", "The specified product does not exist")
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, productNotFoundErrorTitleMsg, productNotFoundErrorMsg)
 		return
 	}
 
 	var productUUID pgtype.UUID
 	if err := productUUID.Scan(req.ProductID); err != nil {
 		h.logger.Warn(invalidProductIDErrorMsg, "error", err)
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Product ID", "The product ID format is invalid")
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidProductIDErrorTitleMsg, "The product ID format is invalid")
 		return
 	}
 
@@ -328,7 +339,7 @@ func (h *Handler) RemoveProductFromCartHandler(w http.ResponseWriter, r *http.Re
 	var productUUID pgtype.UUID
 	if err := productUUID.Scan(productID); err != nil {
 		h.logger.Warn(invalidProductIDErrorMsg, "error", err)
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Product ID", invalidProductIDErrorMsg)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidProductIDErrorTitleMsg, invalidProductIDErrorMsg)
 		return
 	}
 
@@ -339,7 +350,7 @@ func (h *Handler) RemoveProductFromCartHandler(w http.ResponseWriter, r *http.Re
 	}
 	if _, exists := product[productID]; !exists {
 		h.logger.Warn("product not found", "product_id", productID)
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Product Not Found", "The specified product does not exist")
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, productNotFoundErrorTitleMsg, productNotFoundErrorMsg)
 		return
 	}
 

@@ -68,7 +68,7 @@ services:
       PORT: ${CART_SERVICE_PORT}
       DATABASE_URL: postgres://${CART_POSTGRES_USER}:${CART_POSTGRES_PASSWORD}@cart-db:5432/${CART_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
-      USER_SERVICE_URL: ${USER_SERVICE_URL}
+      PRODUCT_SERVICE_URL: ${PRODUCT_SERVICE_URL}
     depends_on:
       cart-db:
         condition: service_healthy
