@@ -29,12 +29,16 @@ func main() {
 	logger.Info("database connected successfully")
 	defer pgDb.Close()
 
-	productServiceURL := os.Getenv("PRODUCT_SERVICE_URL")
-	if productServiceURL == "" {
-		logger.Error("PRODUCT_SERVICE_URL is not set")
+	productServiceGrpcURL := os.Getenv("PRODUCT_SERVICE_GRPC_URL")
+	if productServiceGrpcURL == "" {
+		logger.Error("PRODUCT_SERVICE_GRPC_URL is not set")
 		os.Exit(1)
 	}
-	productClient := clients.NewProductClient(productServiceURL, logger)
+	productClient, err := clients.NewProductClient(productServiceGrpcURL, logger)
+	if err != nil {
+		logger.Error("failed to create product client", "error", err)
+		os.Exit(1)
+	}
 
 	mux := router.ConfigRoutes(pgDb, productClient, logger)
 

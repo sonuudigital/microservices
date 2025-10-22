@@ -2,30 +2,32 @@ package clients
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
-	"time"
 
 	"github.com/sonuudigital/microservices/cart-service/internal/handlers"
+	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	"github.com/sonuudigital/microservices/shared/logs"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type ProductClient struct {
-	httpClient *http.Client
-	baseURL    string
-	logger     logs.Logger
+	logger logs.Logger
+	client productv1.ProductServiceClient
 }
 
-func NewProductClient(baseURL string, logger logs.Logger) *ProductClient {
-	return &ProductClient{
-		httpClient: &http.Client{
-			Timeout: 5 * time.Second,
-		},
-		baseURL: baseURL,
-		logger:  logger,
+func NewProductClient(grpcAddr string, logger logs.Logger) (*ProductClient, error) {
+	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
 	}
+
+	return &ProductClient{
+		logger: logger,
+		client: productv1.NewProductServiceClient(conn),
+	}, nil
 }
 
 func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map[string]handlers.ProductByIDResponse, error) {
@@ -33,44 +35,36 @@ func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map
 		return make(map[string]handlers.ProductByIDResponse), nil
 	}
 
-	idsQueryParam := strings.Join(ids, ",")
-	url := fmt.Sprintf("%s/api/products/ids?ids=%s", c.baseURL, idsQueryParam)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		c.logger.Error("failed to create request to product-service", "error", err, "url", url)
-		return nil, fmt.Errorf("could not create request to product-service: %w", err)
+	req := &productv1.GetProductsByIDsRequest{
+		Ids: ids,
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.client.GetProductsByIDs(ctx, req)
 	if err != nil {
-		c.logger.Error("failed to send request to product-service", "error", err, "url", url)
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				return nil, handlers.ErrInvalidProductID
+			case codes.NotFound:
+				return nil, handlers.ErrProductNotFound
+			case codes.Unavailable:
+				return nil, handlers.ErrProductServiceUnavailable
+			default:
+				return nil, handlers.ErrProductInternalError
+			}
+		}
 		return nil, fmt.Errorf("request to product-service failed: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		switch resp.StatusCode {
-		case http.StatusBadRequest:
-			return nil, handlers.ErrInvalidProductID
-		case http.StatusNotFound:
-			return nil, handlers.ErrProductServiceUnavailable
-		case http.StatusServiceUnavailable:
-			return nil, handlers.ErrProductServiceUnavailable
-		default:
-			return nil, handlers.ErrProductInternalError
+	productsMap := make(map[string]handlers.ProductByIDResponse, len(resp.Products))
+	for _, p := range resp.Products {
+		productsMap[p.Id] = handlers.ProductByIDResponse{
+			ID:          p.Id,
+			Name:        p.Name,
+			Description: p.Description,
+			Price:       p.Price,
 		}
-	}
-
-	var products []handlers.ProductByIDResponse
-	if err := json.NewDecoder(resp.Body).Decode(&products); err != nil {
-		c.logger.Error("failed to decode product-service response", "error", err)
-		return nil, fmt.Errorf("failed to decode product-service response: %w", err)
-	}
-
-	productsMap := make(map[string]handlers.ProductByIDResponse, len(products))
-	for _, p := range products {
-		productsMap[p.ID] = p
 	}
 
 	return productsMap, nil
