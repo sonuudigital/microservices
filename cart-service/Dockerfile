@@ -5,18 +5,23 @@ ARG TARGETARCH=amd64
 
 WORKDIR /workspace
 COPY shared/go.mod ./shared/
+COPY gen/go.mod ./gen/
 COPY cart-service/go.mod cart-service/go.sum ./cart-service/
 
 WORKDIR /workspace/cart-service
 RUN go mod edit -replace github.com/sonuudigital/microservices/shared=../shared
+RUN go mod edit -replace github.com/sonuudigital/microservices/gen=../gen
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 WORKDIR /workspace
 COPY shared/ ./shared/
+COPY gen/ ./gen/
 COPY cart-service/ ./cart-service/
 
 WORKDIR /workspace/cart-service
-RUN go mod edit -replace github.com/sonuudigital/microservices/shared=../shared && go mod tidy
+RUN go mod edit -replace github.com/sonuudigital/microservices/shared=../shared && \
+    go mod edit -replace github.com/sonuudigital/microservices/gen=../gen && \
+    go mod tidy
 
 ENV CGO_ENABLED=0
 RUN --mount=type=cache,target=/root/.cache/go-build \
@@ -33,4 +38,4 @@ ENV PORT=8083
 
 EXPOSE 8083
 
-CMD ["/cart-service"]
+ENTRYPOINT ["/cart-service"]

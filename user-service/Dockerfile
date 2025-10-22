@@ -33,4 +33,4 @@ ENV PORT=8081
 
 EXPOSE 8081
 
-CMD ["/user-service"]
+ENTRYPOINT ["/user-service"]
