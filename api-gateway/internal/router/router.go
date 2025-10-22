@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 
+	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
 	"github.com/sonuudigital/microservices/shared/auth"
@@ -12,7 +13,7 @@ import (
 
 type authMiddleware func(http.Handler) http.Handler
 
-func New(authHandler *handlers.AuthHandler, jwtManager *auth.JWTManager, logger logs.Logger) (*http.ServeMux, error) {
+func New(authHandler *handlers.AuthHandler, jwtManager *auth.JWTManager, logger logs.Logger, userClient userv1.UserServiceClient) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +23,9 @@ func New(authHandler *handlers.AuthHandler, jwtManager *auth.JWTManager, logger 
 
 	authMw := middlewares.AuthMiddleware(jwtManager, logger)
 
-	err := configAuthAndUserRoutes(mux, authHandler, authMw, logger)
+	userHandler := handlers.NewUserHandler(logger, userClient)
+
+	err := configAuthAndUserRoutes(mux, authHandler, userHandler, authMw, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -40,17 +43,9 @@ func New(authHandler *handlers.AuthHandler, jwtManager *auth.JWTManager, logger 
 	return mux, nil
 }
 
-func configAuthAndUserRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandler, authMiddleware authMiddleware, logger logs.Logger) error {
-	userServiceURL := os.Getenv("USER_SERVICE_URL")
-	userProxy, err := handlers.NewProxyHandler(userServiceURL, logger)
-	if err != nil {
-		logger.Error("failed to create user service proxy", "error", err)
-		return err
-	}
-	protectedUserProxy := authMiddleware(userProxy)
-
-	mux.Handle("GET /api/users/{id}", protectedUserProxy)
-	mux.Handle("POST /api/users", userProxy)
+func configAuthAndUserRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler, authMiddleware authMiddleware, logger logs.Logger) error {
+	mux.Handle("GET /api/users/{id}", authMiddleware(http.HandlerFunc(userHandler.GetUserByIDHandler)))
+	mux.HandleFunc("POST /api/users", userHandler.CreateUserHandler)
 	mux.HandleFunc("POST /api/auth/login", authHandler.LoginHandler)
 
 	return nil

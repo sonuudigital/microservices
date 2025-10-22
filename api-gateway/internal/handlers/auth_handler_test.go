@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -10,22 +11,52 @@ import (
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
+	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
-	"github.com/sonuudigital/microservices/shared/web"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
 	emailTest = "test@example.com"
 	loginURL  = "/api/auth/login"
 )
+
+type mockUserServiceClient struct {
+	mock.Mock
+}
+
+func (m *mockUserServiceClient) AuthorizeUser(ctx context.Context, in *userv1.AuthorizeUserRequest, opts ...grpc.CallOption) (*userv1.User, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*userv1.User), args.Error(1)
+}
+
+func (m *mockUserServiceClient) CreateUser(ctx context.Context, in *userv1.CreateUserRequest, opts ...grpc.CallOption) (*userv1.User, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*userv1.User), args.Error(1)
+}
+
+func (m *mockUserServiceClient) GetUserByID(ctx context.Context, in *userv1.GetUserByIDRequest, opts ...grpc.CallOption) (*userv1.User, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*userv1.User), args.Error(1)
+}
 
 func TestLoginHandler(t *testing.T) {
 	logger := logs.NewSlogLogger()
@@ -45,17 +76,10 @@ func TestLoginHandler(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Run("Successful Login", func(t *testing.T) {
-		mockUserService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(handlers.UserResponse{
-				ID:    "user-123",
-				Email: emailTest,
-			})
-		}))
-		defer mockUserService.Close()
-		os.Setenv("USER_SERVICE_URL", mockUserService.URL)
+		mockClient := new(mockUserServiceClient)
+		authHandler := handlers.NewAuthHandler(logger, jwtManager, mockClient)
 
-		authHandler := handlers.NewAuthHandler(logger, jwtManager)
+		mockClient.On("AuthorizeUser", mock.Anything, mock.Anything).Return(&userv1.User{Id: "user-123", Email: emailTest}, nil).Once()
 
 		loginReq := handlers.LoginRequest{Email: emailTest, Password: "password"}
 		body, _ := json.Marshal(loginReq)
@@ -68,24 +92,15 @@ func TestLoginHandler(t *testing.T) {
 		var resp handlers.LoginResponse
 		err := json.NewDecoder(rr.Body).Decode(&resp)
 		assert.NoError(t, err)
-
 		assert.NotEmpty(t, resp.Token)
+		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("Unauthorized from user-service", func(t *testing.T) {
-		mockUserService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/problem+json")
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(web.ProblemDetail{
-				Title:  "Unauthorized",
-				Status: http.StatusUnauthorized,
-				Detail: "invalid credentials",
-			})
-		}))
-		defer mockUserService.Close()
-		os.Setenv("USER_SERVICE_URL", mockUserService.URL)
+		mockClient := new(mockUserServiceClient)
+		authHandler := handlers.NewAuthHandler(logger, jwtManager, mockClient)
 
-		authHandler := handlers.NewAuthHandler(logger, jwtManager)
+		mockClient.On("AuthorizeUser", mock.Anything, mock.Anything).Return(nil, status.Error(codes.Unauthenticated, "invalid credentials")).Once()
 
 		loginReq := handlers.LoginRequest{Email: emailTest, Password: "wrong-password"}
 		body, _ := json.Marshal(loginReq)
@@ -95,16 +110,14 @@ func TestLoginHandler(t *testing.T) {
 		authHandler.LoginHandler(rr, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-
-		var problem web.ProblemDetail
-		err := json.NewDecoder(rr.Body).Decode(&problem)
-		assert.NoError(t, err)
-		assert.Equal(t, "invalid credentials", problem.Detail)
+		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("user-service is down", func(t *testing.T) {
-		os.Setenv("USER_SERVICE_URL", "http://localhost:12345")
-		authHandler := handlers.NewAuthHandler(logger, jwtManager)
+		mockClient := new(mockUserServiceClient)
+		authHandler := handlers.NewAuthHandler(logger, jwtManager, mockClient)
+
+		mockClient.On("AuthorizeUser", mock.Anything, mock.Anything).Return(nil, status.Error(codes.Unavailable, "service unavailable")).Once()
 
 		loginReq := handlers.LoginRequest{Email: emailTest, Password: "password"}
 		body, _ := json.Marshal(loginReq)
@@ -114,5 +127,6 @@ func TestLoginHandler(t *testing.T) {
 		authHandler.LoginHandler(rr, req)
 
 		assert.Equal(t, http.StatusServiceUnavailable, rr.Code)
+		mockClient.AssertExpectations(t)
 	})
 }

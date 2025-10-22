@@ -5,11 +5,14 @@ import (
 	"strconv"
 	"time"
 
+	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/api-gateway/internal/router"
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/web"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/joho/godotenv"
 )
@@ -27,9 +30,11 @@ func main() {
 
 	jwtManager := initializeJWTManager(logger)
 
-	authHandler := handlers.NewAuthHandler(logger, jwtManager)
+	userServiceClient := initializeUserServiceClient(logger)
 
-	mux, err := router.New(authHandler, jwtManager, logger)
+	authHandler := handlers.NewAuthHandler(logger, jwtManager, userServiceClient)
+
+	mux, err := router.New(authHandler, jwtManager, logger, userServiceClient)
 	if err != nil {
 		logger.Error("failed to configure routes", "error", err)
 		os.Exit(1)
@@ -44,6 +49,22 @@ func main() {
 
 	logger.Info("server initialized successfully", "port", os.Getenv("PORT"))
 	web.StartServerAndWaitForShutdown(srv, logger)
+}
+
+func initializeUserServiceClient(logger logs.Logger) userv1.UserServiceClient {
+	userServiceURL := os.Getenv("USER_SERVICE_GRPC_URL")
+	if userServiceURL == "" {
+		logger.Error("USER_SERVICE_GRPC_URL not found in environment variables")
+		os.Exit(1)
+	}
+
+	conn, err := grpc.NewClient(userServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Error("failed to connect to user service", "error", err)
+		os.Exit(1)
+	}
+
+	return userv1.NewUserServiceClient(conn)
 }
 
 func initializeJWTManager(logger logs.Logger) *auth.JWTManager {
