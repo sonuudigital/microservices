@@ -6,9 +6,15 @@ import (
 	"net/http"
 
 	"github.com/sonuudigital/microservices/shared/logs"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
+	contentType             = "Content-Type"
+	failedToEncodeMsg       = "failed to encode response"
+	failedToEncodeErrRspMsg = "failed to encode error response"
+
 	ReqCancelledMsg = "request cancelled"
 )
 
@@ -20,16 +26,25 @@ type ProblemDetail struct {
 	Instance string `json:"instance,omitempty"`
 }
 
+type GRPCProblemDetail struct {
+	Type     string `json:"type"`
+	Title    string `json:"title"`
+	Status   int    `json:"status"`
+	Detail   string `json:"detail,omitempty"`
+	Instance string `json:"instance,omitempty"`
+	Details  []any  `json:"details,omitempty"`
+}
+
 func RespondWithJSON(w http.ResponseWriter, logger logs.Logger, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(contentType, "application/json")
 	w.WriteHeader(status)
 
 	if payload != nil {
 		if err := json.NewEncoder(w).Encode(payload); err != nil {
 			if logger != nil {
-				logger.Error("failed to encode response", "error", err)
+				logger.Error(failedToEncodeMsg, "error", err)
 			}
-			http.Error(w, "failed to encode response", http.StatusInternalServerError)
+			http.Error(w, failedToEncodeMsg, http.StatusInternalServerError)
 		}
 	}
 }
@@ -43,14 +58,37 @@ func RespondWithError(w http.ResponseWriter, logger logs.Logger, r *http.Request
 		Instance: r.URL.Path,
 	}
 
-	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set(contentType, "application/problem+json")
 	w.WriteHeader(status)
 
 	if err := json.NewEncoder(w).Encode(problem); err != nil {
 		if logger != nil {
-			logger.Error("failed to encode error response", "error", err)
+			logger.Error(failedToEncodeErrRspMsg, "error", err)
 		}
-		http.Error(w, "failed to encode error response", http.StatusInternalServerError)
+		http.Error(w, failedToEncodeErrRspMsg, http.StatusInternalServerError)
+	}
+}
+
+func RespondWithGRPCError(w http.ResponseWriter, r *http.Request, grpcStatus *status.Status, logger logs.Logger) {
+	httpStatus := HTTPStatusFromGRPC(grpcStatus.Code())
+
+	problem := GRPCProblemDetail{
+		Type:     getErrorDocumentationLink(httpStatus),
+		Title:    grpcStatus.Message(),
+		Status:   httpStatus,
+		Detail:   grpcStatus.Message(),
+		Instance: r.URL.Path,
+		Details:  grpcStatus.Details(),
+	}
+
+	w.Header().Set(contentType, "application/problem+json")
+	w.WriteHeader(httpStatus)
+
+	if err := json.NewEncoder(w).Encode(problem); err != nil {
+		if logger != nil {
+			logger.Error(failedToEncodeErrRspMsg, "error", err)
+		}
+		http.Error(w, failedToEncodeErrRspMsg, http.StatusInternalServerError)
 	}
 }
 
@@ -62,6 +100,47 @@ func CheckContext(ctx context.Context, logger logs.Logger) bool {
 		return false
 	}
 	return true
+}
+
+func HTTPStatusFromGRPC(code codes.Code) int {
+	switch code {
+	case codes.OK:
+		return http.StatusOK
+	case codes.Canceled:
+		return 499
+	case codes.Unknown:
+		return http.StatusInternalServerError
+	case codes.InvalidArgument:
+		return http.StatusBadRequest
+	case codes.DeadlineExceeded:
+		return http.StatusGatewayTimeout
+	case codes.NotFound:
+		return http.StatusNotFound
+	case codes.AlreadyExists:
+		return http.StatusConflict
+	case codes.PermissionDenied:
+		return http.StatusForbidden
+	case codes.ResourceExhausted:
+		return http.StatusTooManyRequests
+	case codes.FailedPrecondition:
+		return http.StatusBadRequest
+	case codes.Aborted:
+		return http.StatusConflict
+	case codes.OutOfRange:
+		return http.StatusBadRequest
+	case codes.Unimplemented:
+		return http.StatusNotImplemented
+	case codes.Internal:
+		return http.StatusInternalServerError
+	case codes.Unavailable:
+		return http.StatusServiceUnavailable
+	case codes.DataLoss:
+		return http.StatusInternalServerError
+	case codes.Unauthenticated:
+		return http.StatusUnauthorized
+	default:
+		return http.StatusInternalServerError
+	}
 }
 
 func getErrorDocumentationLink(status int) string {
@@ -76,6 +155,22 @@ func getErrorDocumentationLink(status int) string {
 		return "https://tools.ietf.org/html/rfc7231#section-6.5.4"
 	case http.StatusInternalServerError:
 		return "https://tools.ietf.org/html/rfc7231#section-6.6.1"
+	case http.StatusServiceUnavailable:
+		return "https://tools.ietf.org/html/rfc7231#section-6.6.4"
+	case http.StatusRequestTimeout:
+		return "https://tools.ietf.org/html/rfc7231#section-6.5.7"
+	case http.StatusConflict:
+		return "https://tools.ietf.org/html/rfc7231#section-6.5.8"
+	case http.StatusTooManyRequests:
+		return "https://tools.ietf.org/html/rfc6585#section-4"
+	case http.StatusNotImplemented:
+		return "https://tools.ietf.org/html/rfc7231#section-6.6.2"
+	case http.StatusGatewayTimeout:
+		return "https://tools.ietf.org/html/rfc7231#section-6.6.3"
+	case http.StatusBadGateway:
+		return "https://tools.ietf.org/html/rfc7231#section-6.6.3"
+	case 499:
+		return "https://httpstatuses.com/499"
 	default:
 		return "about:blank"
 	}
