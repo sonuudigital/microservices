@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"context"
+	"errors"
 
-	"github.com/sonuudigital/microservices/cart-service/internal/clients"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/logs"
 )
@@ -28,8 +28,22 @@ const (
 	userIdHeader                = "X-User-ID"
 )
 
+var (
+	ErrProductNotFound           = errors.New("product not found")
+	ErrInvalidProductID          = errors.New(invalidProductIDErrorMsg)
+	ErrProductServiceUnavailable = errors.New("product service unavailable")
+	ErrProductInternalError      = errors.New("product service internal error")
+)
+
+type ProductByIDResponse struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+}
+
 type ProductFetcher interface {
-	GetProductsByIDs(ctx context.Context, ids []string) (map[string]clients.ProductByIDResponse, error)
+	GetProductsByIDs(ctx context.Context, ids []string) (map[string]ProductByIDResponse, error)
 }
 
 type Handler struct {

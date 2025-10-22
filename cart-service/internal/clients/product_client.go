@@ -8,24 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sonuudigital/microservices/cart-service/internal/handlers"
 	"github.com/sonuudigital/microservices/shared/logs"
 )
-
-type ProductClientError struct {
-	StatusCode int
-	Message    string
-}
-
-func (e *ProductClientError) Error() string {
-	return e.Message
-}
-
-type ProductByIDResponse struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-}
 
 type ProductClient struct {
 	httpClient *http.Client
@@ -43,9 +28,9 @@ func NewProductClient(baseURL string, logger logs.Logger) *ProductClient {
 	}
 }
 
-func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map[string]ProductByIDResponse, error) {
+func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map[string]handlers.ProductByIDResponse, error) {
 	if len(ids) == 0 {
-		return make(map[string]ProductByIDResponse), nil
+		return make(map[string]handlers.ProductByIDResponse), nil
 	}
 
 	idsQueryParam := strings.Join(ids, ",")
@@ -65,19 +50,25 @@ func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, &ProductClientError{
-			StatusCode: resp.StatusCode,
-			Message:    fmt.Sprintf("unexpected status code from product-service: %d", resp.StatusCode),
+		switch resp.StatusCode {
+		case http.StatusBadRequest:
+			return nil, handlers.ErrInvalidProductID
+		case http.StatusNotFound:
+			return nil, handlers.ErrProductServiceUnavailable
+		case http.StatusServiceUnavailable:
+			return nil, handlers.ErrProductServiceUnavailable
+		default:
+			return nil, handlers.ErrProductInternalError
 		}
 	}
 
-	var products []ProductByIDResponse
+	var products []handlers.ProductByIDResponse
 	if err := json.NewDecoder(resp.Body).Decode(&products); err != nil {
 		c.logger.Error("failed to decode product-service response", "error", err)
 		return nil, fmt.Errorf("failed to decode product-service response: %w", err)
 	}
 
-	productsMap := make(map[string]ProductByIDResponse, len(products))
+	productsMap := make(map[string]handlers.ProductByIDResponse, len(products))
 	for _, p := range products {
 		productsMap[p.ID] = p
 	}

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/sonuudigital/microservices/cart-service/internal/clients"
 	"github.com/sonuudigital/microservices/cart-service/internal/handlers"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/logs"
@@ -34,7 +33,7 @@ func testRemoveProductFromCartSuccess(t *testing.T) {
 	_ = userUUID.Scan(uuidTest)
 	_ = productUUID.Scan(productIDTest)
 
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
 		productIDTest: {ID: productIDTest},
 	}, nil).Once()
 	mockQuerier.On("RemoveProductFromCart", mock.Anything, repository.RemoveProductFromCartParams{
@@ -92,7 +91,7 @@ func testRemoveProductFromCartProductNotFound(t *testing.T) {
 	logger := logs.NewSlogLogger()
 	handler := handlers.NewHandler(mockQuerier, mockProductFetcher, logger)
 
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{}, nil).Once()
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{}, nil).Once()
 
 	req, _ := http.NewRequest("DELETE", cartsURL+productsIDPath, nil)
 	req.Header.Set(userIDHeader, uuidTest)
@@ -136,7 +135,7 @@ func testRemoveProductFromCartDBError(t *testing.T) {
 	_ = userUUID.Scan(uuidTest)
 	_ = productUUID.Scan(productIDTest)
 
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]clients.ProductByIDResponse{
+	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]handlers.ProductByIDResponse{
 		productIDTest: {ID: productIDTest},
 	}, nil).Once()
 	mockQuerier.On("RemoveProductFromCart", mock.Anything, repository.RemoveProductFromCartParams{
