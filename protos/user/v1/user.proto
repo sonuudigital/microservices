@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package user.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/sonuudigital/microservices/gen/user/v1;userv1";
+
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (User);
+  rpc GetUserByID(GetUserByIDRequest) returns (User);
+  rpc AuthorizeUser(AuthorizeUserRequest) returns (User);
+}
+
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message GetUserByIDRequest {
+  string id = 1;
+}
+
+message AuthorizeUserRequest {
+  string email = 1;
+  string password = 2;
+}
