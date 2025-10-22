@@ -14,8 +14,8 @@ import (
 )
 
 type ProductClient struct {
-	logger logs.Logger
 	client productv1.ProductServiceClient
+	logger logs.Logger
 }
 
 func NewProductClient(grpcAddr string, logger logs.Logger) (*ProductClient, error) {
