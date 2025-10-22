@@ -57,8 +57,6 @@ func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map
 		return nil, fmt.Errorf("could not create request to product-service: %w", err)
 	}
 
-	c.logger.Debug("sending request to product-service", "url", url)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		c.logger.Error("failed to send request to product-service", "error", err, "url", url)
@@ -67,7 +65,6 @@ func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		c.logger.Warn("unexpected status code from product-service", "status_code", resp.StatusCode, "url", url)
 		return nil, &ProductClientError{
 			StatusCode: resp.StatusCode,
 			Message:    fmt.Sprintf("unexpected status code from product-service: %d", resp.StatusCode),
