@@ -1,6 +1,6 @@
 module github.com/sonuudigital/microservices/gen
 
-go 1.25.3
+go 1.25.0
 
 require (
 	google.golang.org/grpc v1.76.0

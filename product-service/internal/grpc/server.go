@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
@@ -52,7 +53,12 @@ func (s *Server) GetProductsByIDs(ctx context.Context, req *productv1.GetProduct
 func ToGRPCProduct(p repository.Product) *productv1.Product {
 	var price float64
 	if p.Price.Valid {
-		_ = p.Price.Scan(&price)
+		v, err := p.Price.Value()
+		if err == nil {
+			if s, ok := v.(string); ok {
+				price, _ = strconv.ParseFloat(s, 64)
+			}
+		}
 	}
 
 	var updatedAt *timestamppb.Timestamp

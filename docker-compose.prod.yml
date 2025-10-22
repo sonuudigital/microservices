@@ -53,6 +53,7 @@ services:
     restart: always
     environment:
       PORT: ${PRODUCT_SERVICE_PORT}
+      PRODUCT_SERVICE_GRPC_PORT: ${PRODUCT_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${PRODUCT_POSTGRES_USER}:${PRODUCT_POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
     depends_on:
@@ -72,7 +73,7 @@ services:
       PORT: ${CART_SERVICE_PORT}
       DATABASE_URL: postgres://${CART_POSTGRES_USER}:${CART_POSTGRES_PASSWORD}@cart-db:5432/${CART_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
-      USER_SERVICE_URL: ${USER_SERVICE_URL}
+      PRODUCT_SERVICE_GRPC_URL: "product-service:${PRODUCT_SERVICE_GRPC_PORT}"
     depends_on:
       cart-db:
         condition: service_healthy

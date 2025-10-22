@@ -22,7 +22,12 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE}
       JWT_TTL_MINUTES: ${JWT_TTL_MINUTES}
     depends_on:
-      - user-service
+      user-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      cart-service:
+        condition: service_started
     networks:
       - ecommerce-network
 
@@ -50,8 +55,11 @@ services:
       dockerfile: product-service/Dockerfile
     environment:
       PORT: ${PRODUCT_SERVICE_PORT}
+      PRODUCT_SERVICE_GRPC_PORT: ${PRODUCT_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${PRODUCT_POSTGRES_USER}:${PRODUCT_POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
+    expose:
+      - "${PRODUCT_SERVICE_GRPC_PORT}"
     depends_on:
       product-db:
         condition: service_healthy
@@ -68,10 +76,12 @@ services:
       PORT: ${CART_SERVICE_PORT}
       DATABASE_URL: postgres://${CART_POSTGRES_USER}:${CART_POSTGRES_PASSWORD}@cart-db:5432/${CART_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
-      PRODUCT_SERVICE_URL: ${PRODUCT_SERVICE_URL}
+      PRODUCT_SERVICE_GRPC_URL: ${PRODUCT_SERVICE_GRPC_URL}
     depends_on:
       cart-db:
         condition: service_healthy
+      product-service:
+        condition: service_started
     networks:
       - ecommerce-network
 

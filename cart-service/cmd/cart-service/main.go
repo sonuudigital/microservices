@@ -39,6 +39,7 @@ func main() {
 		logger.Error("failed to create product client", "error", err)
 		os.Exit(1)
 	}
+	logger.Info("product client created successfully", "url", productServiceGrpcURL)
 
 	mux := router.ConfigRoutes(pgDb, productClient, logger)
 
