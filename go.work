@@ -1,8 +1,9 @@
-go 1.25.0
+go 1.25.3
 
 use (
 	./api-gateway
 	./cart-service
+	./gen
 	./notification-service
 	./order-service
 	./payment-service
