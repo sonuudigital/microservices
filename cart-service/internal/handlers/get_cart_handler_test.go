@@ -8,7 +8,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/sonuudigital/microservices/cart-service/internal/clients"
 	"github.com/sonuudigital/microservices/cart-service/internal/handlers"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/logs"
@@ -44,7 +43,7 @@ func testGetCartSuccess(t *testing.T) {
 	mockQuerier.On("GetCartProductsByCartID", mock.Anything, cartUUID).Return(cartItems, nil).Once()
 
 	productIDs := []string{product1UUID.String(), product2UUID.String()}
-	fetchedProducts := map[string]clients.ProductByIDResponse{
+	fetchedProducts := map[string]handlers.ProductByIDResponse{
 		product1UUID.String(): {ID: product1UUID.String(), Name: "Product 1", Price: 10.00},
 		product2UUID.String(): {ID: product2UUID.String(), Name: "Product 2", Price: 5.50},
 	}

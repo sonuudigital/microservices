@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/sonuudigital/microservices/cart-service/internal/clients"
+	"github.com/sonuudigital/microservices/cart-service/internal/handlers"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	"github.com/stretchr/testify/mock"
 )
@@ -84,9 +84,9 @@ type MockProductFetcher struct {
 	mock.Mock
 }
 
-func (m *MockProductFetcher) GetProductsByIDs(ctx context.Context, ids []string) (map[string]clients.ProductByIDResponse, error) {
+func (m *MockProductFetcher) GetProductsByIDs(ctx context.Context, ids []string) (map[string]handlers.ProductByIDResponse, error) {
 	args := m.Called(ctx, ids)
-	if c, ok := args.Get(0).(map[string]clients.ProductByIDResponse); ok {
+	if c, ok := args.Get(0).(map[string]handlers.ProductByIDResponse); ok {
 		return c, args.Error(1)
 	}
 	return nil, args.Error(1)

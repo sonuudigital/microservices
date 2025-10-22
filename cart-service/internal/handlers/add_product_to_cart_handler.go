@@ -3,12 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/sonuudigital/microservices/cart-service/internal/clients"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/web"
 )
@@ -43,21 +43,24 @@ func (h *Handler) AddProductToCartHandler(w http.ResponseWriter, r *http.Request
 
 	productsMap, err := h.productFetcher.GetProductsByIDs(ctx, []string{req.ProductID})
 	if err != nil {
-		if pce, ok := err.(*clients.ProductClientError); ok {
-			switch pce.StatusCode {
-			case http.StatusBadRequest:
-				h.logger.Warn("invalid product ID format", "product_id", req.ProductID, "error", err)
-				web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidProductIDErrorTitleMsg, "The product ID format is invalid")
-				return
-			case http.StatusNotFound:
-				h.logger.Warn("product not found in product service", "product_id", req.ProductID)
-				web.RespondWithError(w, h.logger, r, http.StatusNotFound, productNotFoundErrorTitleMsg, productNotFoundErrorMsg)
-				return
-			}
+		switch {
+		case errors.Is(err, ErrInvalidProductID):
+			h.logger.Warn("invalid product ID format", "product_id", req.ProductID, "error", err)
+			web.RespondWithError(w, h.logger, r, http.StatusBadRequest, invalidProductIDErrorTitleMsg, "The product ID format is invalid")
+			return
+		case errors.Is(err, ErrProductNotFound):
+			h.logger.Warn("product not found in product service", "product_id", req.ProductID)
+			web.RespondWithError(w, h.logger, r, http.StatusNotFound, productNotFoundErrorTitleMsg, productNotFoundErrorMsg)
+			return
+		case errors.Is(err, ErrProductServiceUnavailable):
+			h.logger.Error("product service unavailable", "error", err)
+			web.RespondWithError(w, h.logger, r, http.StatusServiceUnavailable, "Product Service Unavailable", "The product service is currently unavailable")
+			return
+		default:
+			h.logger.Error("failed to fetch product details", "error", err, "product_id", req.ProductID)
+			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, "Product Fetch Failed", "Could not retrieve product details")
+			return
 		}
-		h.logger.Error("failed to fetch product details", "error", err, "product_id", req.ProductID)
-		web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, "Product Fetch Failed", "Could not retrieve product details")
-		return
 	}
 
 	product, exists := productsMap[req.ProductID]
