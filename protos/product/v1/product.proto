@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package product.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/sonuudigital/microservices/gen/product/v1;productv1";
+
+service ProductService {
+  rpc GetProductsByIDs(GetProductsByIDsRequest) returns (GetProductsByIDsResponse);
+}
+
+message Product {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string code = 4;
+  double price = 5;
+  int32 stock_quantity = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message GetProductsByIDsRequest {
+  repeated string ids = 1;
+}
+
+message GetProductsByIDsResponse {
+  repeated Product products = 1;
+}
