@@ -8,6 +8,8 @@ import (
 	"github.com/sonuudigital/microservices/shared/logs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -40,11 +42,28 @@ func RespondWithJSON(w http.ResponseWriter, logger logs.Logger, status int, payl
 	w.WriteHeader(status)
 
 	if payload != nil {
-		if err := json.NewEncoder(w).Encode(payload); err != nil {
+		var err error
+		var marshalledPayload []byte
+
+		if p, ok := payload.(proto.Message); ok {
+			marshalledPayload, err = protojson.Marshal(p)
+		} else {
+			marshalledPayload, err = json.Marshal(payload)
+		}
+
+		if err != nil {
 			if logger != nil {
 				logger.Error(failedToEncodeMsg, "error", err)
 			}
 			http.Error(w, failedToEncodeMsg, http.StatusInternalServerError)
+			return
+		}
+
+		_, err = w.Write(marshalledPayload)
+		if err != nil {
+			if logger != nil {
+				logger.Error("failed to write response", "error", err)
+			}
 		}
 	}
 }

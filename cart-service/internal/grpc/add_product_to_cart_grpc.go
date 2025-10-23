@@ -29,7 +29,7 @@ func (s *GRPCServer) AddProductToCart(ctx context.Context, req *cartv1.AddProduc
 
 	productsMap, err := s.productFetcher.GetProductsByIDs(ctx, []string{req.ProductId})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to fetch product details: %v", err)
+		return nil, err
 	}
 
 	product, exists := productsMap[req.ProductId]

@@ -7,6 +7,7 @@ import (
 
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/api-gateway/internal/router"
+	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/auth"
@@ -33,10 +34,11 @@ func main() {
 
 	userServiceClient := initializeUserServiceClient(logger)
 	productServiceClient := initializeProductServiceClient(logger)
+	cartServiceClient := initializeCartServiceClient(logger)
 
 	authHandler := handlers.NewAuthHandler(logger, jwtManager, userServiceClient)
 
-	mux, err := router.New(authHandler, jwtManager, logger, userServiceClient, productServiceClient)
+	mux, err := router.New(authHandler, jwtManager, logger, userServiceClient, productServiceClient, cartServiceClient)
 	if err != nil {
 		logger.Error("failed to configure routes", "error", err)
 		os.Exit(1)
@@ -87,6 +89,24 @@ func initializeProductServiceClient(logger logs.Logger) productv1.ProductService
 	logger.Info("connected to product service", "address", productServiceURL)
 
 	return productv1.NewProductServiceClient(conn)
+}
+
+func initializeCartServiceClient(logger logs.Logger) cartv1.CartServiceClient {
+	cartServiceURL := os.Getenv("CART_SERVICE_GRPC_URL")
+	if cartServiceURL == "" {
+		logger.Error("CART_SERVICE_GRPC_URL not found in environment variables")
+		os.Exit(1)
+	}
+
+	conn, err := grpc.NewClient(cartServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Error("failed to connect to cart service", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("connected to cart service", "address", cartServiceURL)
+
+	return cartv1.NewCartServiceClient(conn)
 }
 
 func initializeJWTManager(logger logs.Logger) *auth.JWTManager {
