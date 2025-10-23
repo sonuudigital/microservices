@@ -11,10 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	contentType = "Content-Type"
-)
-
 type AuthHandler struct {
 	logger     logs.Logger
 	jwtManager *auth.JWTManager

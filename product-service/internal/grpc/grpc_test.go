@@ -1,4 +1,4 @@
-package handlers_test
+package grpc_test
 
 import (
 	"context"
@@ -9,11 +9,7 @@ import (
 )
 
 const (
-	uuidTest           = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-	productsURL        = "/api/products"
-	dbErrorTitle       = "DB Error"
-	dbErrorMsg         = "db error"
-	apiProductsIdsPath = "/api/products/ids?ids="
+	uuidTest = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
 )
 
 type MockQuerier struct {
