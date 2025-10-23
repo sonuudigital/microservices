@@ -1,13 +1,18 @@
 package main
 
 import (
+	"fmt"
+	"net"
 	"os"
 
 	"github.com/sonuudigital/microservices/cart-service/internal/clients"
-	"github.com/sonuudigital/microservices/cart-service/internal/router"
+	grpc_server "github.com/sonuudigital/microservices/cart-service/internal/grpc"
+	"github.com/sonuudigital/microservices/cart-service/internal/repository"
+	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/web"
+	"google.golang.org/grpc"
 
 	"github.com/joho/godotenv"
 )
@@ -41,15 +46,22 @@ func main() {
 	}
 	logger.Info("product client created successfully", "url", productServiceGrpcURL)
 
-	mux := router.ConfigRoutes(pgDb, productClient, logger)
-
-	port := os.Getenv("PORT")
-	srv, err := web.InitializeServer(port, mux, logger)
-	if err != nil {
-		logger.Error("failed to initialize server", "error", err)
+	grpcPort := os.Getenv("CART_SERVICE_GRPC_PORT")
+	if grpcPort == "" {
+		logger.Error("CART_SERVICE_GRPC_PORT is not set")
 		os.Exit(1)
 	}
 
-	logger.Info("server initialized successfully", "port", port)
-	web.StartServerAndWaitForShutdown(srv, logger)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", grpcPort))
+	if err != nil {
+		logger.Error("failed to listen for gRPC", "error", err)
+		os.Exit(1)
+	}
+
+	queries := repository.New(pgDb)
+	grpcServer := grpc.NewServer()
+	cartServer := grpc_server.NewGRPCServer(queries, productClient, logger)
+	cartv1.RegisterCartServiceServer(grpcServer, cartServer)
+
+	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
 }

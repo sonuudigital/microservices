@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package cart.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/sonuudigital/microservices/gen/cart/v1;cartv1";
+
+service CartService {
+  rpc GetCart(GetCartRequest) returns (GetCartResponse);
+  rpc AddProductToCart(AddProductToCartRequest) returns (AddProductToCartResponse);
+  rpc RemoveProductFromCart(RemoveProductFromCartRequest) returns (google.protobuf.Empty);
+  rpc ClearCart(ClearCartRequest) returns (google.protobuf.Empty);
+  rpc DeleteCart(DeleteCartRequest) returns (google.protobuf.Empty);
+}
+
+message CartProduct {
+  string product_id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  int32 quantity = 5;
+}
+
+message GetCartRequest {
+  string user_id = 1;
+}
+
+message GetCartResponse {
+  string id = 1;
+  string user_id = 2;
+  repeated CartProduct products = 3;
+  double total_price = 4;
+}
+
+message AddProductToCartRequest {
+  string user_id = 1;
+  string product_id = 2;
+  int32 quantity = 3;
+}
+
+message AddProductToCartResponse {
+  string id = 1;
+  string cart_id = 2;
+  string product_id = 3;
+  int32 quantity = 4;
+  double price = 5;
+  google.protobuf.Timestamp added_at = 6;
+}
+
+message RemoveProductFromCartRequest {
+  string user_id = 1;
+  string product_id = 2;
+}
+
+message ClearCartRequest {
+  string user_id = 1;
+}
+
+message DeleteCartRequest {
+  string user_id = 1;
+}

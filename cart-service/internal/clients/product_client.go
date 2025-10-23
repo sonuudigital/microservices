@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sonuudigital/microservices/cart-service/internal/handlers"
+	grpc_server "github.com/sonuudigital/microservices/cart-service/internal/grpc"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"google.golang.org/grpc"
@@ -30,9 +30,13 @@ func NewProductClient(grpcAddr string, logger logs.Logger) (*ProductClient, erro
 	}, nil
 }
 
-func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map[string]handlers.ProductByIDResponse, error) {
+func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map[string]grpc_server.Product, error) {
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("request to product service canceled or timed out: %w", ctx.Err())
+	}
+
 	if len(ids) == 0 {
-		return make(map[string]handlers.ProductByIDResponse), nil
+		return make(map[string]grpc_server.Product), nil
 	}
 
 	req := &productv1.GetProductsByIDsRequest{
@@ -45,21 +49,23 @@ func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map
 		if ok {
 			switch st.Code() {
 			case codes.InvalidArgument:
-				return nil, handlers.ErrInvalidProductID
+				return nil, fmt.Errorf("invalid product ID")
 			case codes.NotFound:
-				return nil, handlers.ErrProductNotFound
+				return nil, fmt.Errorf("product not found")
 			case codes.Unavailable:
-				return nil, handlers.ErrProductServiceUnavailable
+				return nil, fmt.Errorf("product service unavailable")
+			case codes.Canceled:
+				return nil, fmt.Errorf("request to product service canceled")
 			default:
-				return nil, handlers.ErrProductInternalError
+				return nil, fmt.Errorf("product service internal error")
 			}
 		}
 		return nil, fmt.Errorf("request to product-service failed: %w", err)
 	}
 
-	productsMap := make(map[string]handlers.ProductByIDResponse, len(resp.Products))
+	productsMap := make(map[string]grpc_server.Product, len(resp.Products))
 	for _, p := range resp.Products {
-		productsMap[p.Id] = handlers.ProductByIDResponse{
+		productsMap[p.Id] = grpc_server.Product{
 			ID:          p.Id,
 			Name:        p.Name,
 			Description: p.Description,
