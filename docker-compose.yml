@@ -14,7 +14,7 @@ services:
       PORT: ${API_GATEWAY_PORT}
       USER_SERVICE_GRPC_URL: ${USER_SERVICE_GRPC_URL}
       PRODUCT_SERVICE_GRPC_URL: ${PRODUCT_SERVICE_GRPC_URL}
-      CART_SERVICE_URL: ${CART_SERVICE_URL}
+      CART_SERVICE_GRPC_URL: ${CART_SERVICE_GRPC_URL}
       LOG_LEVEL: ${LOG_LEVEL}
       JWT_PRIVATE_KEY_PATH: /certs/private.pem
       JWT_PUBLIC_KEY_PATH: /certs/public.pem
@@ -40,7 +40,6 @@ services:
     expose:
       - "${USER_SERVICE_GRPC_PORT}"
     environment:
-      PORT: ${USER_SERVICE_PORT}
       USER_SERVICE_GRPC_PORT: ${USER_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${USER_POSTGRES_USER}:${USER_POSTGRES_PASSWORD}@user-db:5432/${USER_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
@@ -59,7 +58,6 @@ services:
     expose:
       - "${PRODUCT_SERVICE_GRPC_PORT}"
     environment:
-      PORT: ${PRODUCT_SERVICE_PORT}
       PRODUCT_SERVICE_GRPC_PORT: ${PRODUCT_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${PRODUCT_POSTGRES_USER}:${PRODUCT_POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
@@ -75,8 +73,10 @@ services:
     build:
       context: .
       dockerfile: cart-service/Dockerfile
+    expose:
+      - "${CART_SERVICE_GRPC_PORT}"
     environment:
-      PORT: ${CART_SERVICE_PORT}
+      CART_SERVICE_GRPC_PORT: ${CART_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${CART_POSTGRES_USER}:${CART_POSTGRES_PASSWORD}@cart-db:5432/${CART_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
       PRODUCT_SERVICE_GRPC_URL: ${PRODUCT_SERVICE_GRPC_URL}
