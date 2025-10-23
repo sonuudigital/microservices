@@ -8,9 +8,7 @@ import (
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
 )
 
 type ProductClient struct {
@@ -45,22 +43,7 @@ func (c *ProductClient) GetProductsByIDs(ctx context.Context, ids []string) (map
 
 	resp, err := c.client.GetProductsByIDs(ctx, req)
 	if err != nil {
-		st, ok := status.FromError(err)
-		if ok {
-			switch st.Code() {
-			case codes.InvalidArgument:
-				return nil, fmt.Errorf("invalid product ID")
-			case codes.NotFound:
-				return nil, fmt.Errorf("product not found")
-			case codes.Unavailable:
-				return nil, fmt.Errorf("product service unavailable")
-			case codes.Canceled:
-				return nil, fmt.Errorf("request to product service canceled")
-			default:
-				return nil, fmt.Errorf("product service internal error")
-			}
-		}
-		return nil, fmt.Errorf("request to product-service failed: %w", err)
+		return nil, err
 	}
 
 	productsMap := make(map[string]grpc_server.Product, len(resp.Products))
