@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
@@ -34,6 +35,10 @@ func main() {
 	logger.Info("database connected successfully")
 	defer pgDb.Close()
 
+	startGRPCServer(pgDb, logger)
+}
+
+func startGRPCServer(pgDb *pgxpool.Pool, logger logs.Logger) {
 	grpcPort := os.Getenv("USER_SERVICE_GRPC_PORT")
 	if grpcPort == "" {
 		logger.Error("USER_SERVICE_GRPC_PORT is not set")

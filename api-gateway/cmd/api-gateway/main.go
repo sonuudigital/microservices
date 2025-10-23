@@ -5,9 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/api-gateway/internal/router"
+	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
+	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/web"
@@ -31,10 +32,11 @@ func main() {
 	jwtManager := initializeJWTManager(logger)
 
 	userServiceClient := initializeUserServiceClient(logger)
+	productServiceClient := initializeProductServiceClient(logger)
 
 	authHandler := handlers.NewAuthHandler(logger, jwtManager, userServiceClient)
 
-	mux, err := router.New(authHandler, jwtManager, logger, userServiceClient)
+	mux, err := router.New(authHandler, jwtManager, logger, userServiceClient, productServiceClient)
 	if err != nil {
 		logger.Error("failed to configure routes", "error", err)
 		os.Exit(1)
@@ -64,7 +66,27 @@ func initializeUserServiceClient(logger logs.Logger) userv1.UserServiceClient {
 		os.Exit(1)
 	}
 
+	logger.Info("connected to user service", "address", userServiceURL)
+
 	return userv1.NewUserServiceClient(conn)
+}
+
+func initializeProductServiceClient(logger logs.Logger) productv1.ProductServiceClient {
+	productServiceURL := os.Getenv("PRODUCT_SERVICE_GRPC_URL")
+	if productServiceURL == "" {
+		logger.Error("PRODUCT_SERVICE_GRPC_URL not found in environment variables")
+		os.Exit(1)
+	}
+
+	conn, err := grpc.NewClient(productServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Error("failed to connect to product service", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("connected to product service", "address", productServiceURL)
+
+	return productv1.NewProductServiceClient(conn)
 }
 
 func initializeJWTManager(logger logs.Logger) *auth.JWTManager {
