@@ -20,7 +20,6 @@ message Product {
   string id = 1;
   string name = 2;
   string description = 3;
-  string code = 4;
   double price = 5;
   int32 stock_quantity = 6;
   google.protobuf.Timestamp created_at = 7;
@@ -38,7 +37,6 @@ message GetProductsByIDsResponse {
 message CreateProductRequest {
   string name = 1;
   string description = 2;
-  string code = 3;
   double price = 4;
   int32 stock_quantity = 5;
 }
@@ -60,7 +58,6 @@ message UpdateProductRequest {
   string id = 1;
   string name = 2;
   string description = 3;
-  string code = 4;
   double price = 5;
   int32 stock_quantity = 6;
 }

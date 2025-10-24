@@ -13,7 +13,7 @@ type GRPCServer struct {
 	queries repository.Querier
 }
 
-func NewGRPCServer(queries repository.Querier) *GRPCServer {
+func NewServer(queries repository.Querier) *GRPCServer {
 	return &GRPCServer{
 		queries: queries,
 	}
@@ -39,7 +39,6 @@ func toGRPCProduct(p repository.Product) *productv1.Product {
 		Id:            p.ID.String(),
 		Name:          p.Name,
 		Description:   p.Description.String,
-		Code:          p.Code,
 		Price:         price,
 		StockQuantity: p.StockQuantity,
 		CreatedAt:     timestamppb.New(p.CreatedAt.Time),

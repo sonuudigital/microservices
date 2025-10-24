@@ -42,7 +42,6 @@ func (h *ProductHandler) CreateProductHandler(w http.ResponseWriter, r *http.Req
 		Name:          req.Name,
 		Description:   req.Description,
 		Price:         req.Price,
-		Code:          req.Code,
 		StockQuantity: req.StockQuantity,
 	}
 
@@ -116,7 +115,6 @@ func (h *ProductHandler) UpdateProductHandler(w http.ResponseWriter, r *http.Req
 		Name:          req.Name,
 		Description:   req.Description,
 		Price:         req.Price,
-		Code:          req.Code,
 		StockQuantity: req.StockQuantity,
 	}
 

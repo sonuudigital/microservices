@@ -23,7 +23,7 @@ func TestGetProduct(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).
 			Return(repository.Product{ID: pgUUID, Name: "Test Product"}, nil).Once()
 
@@ -37,7 +37,7 @@ func TestGetProduct(t *testing.T) {
 
 	t.Run("Not Found", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).Return(repository.Product{}, pgx.ErrNoRows).Once()
 
 		res, err := server.GetProduct(context.Background(), req)
@@ -52,7 +52,7 @@ func TestGetProduct(t *testing.T) {
 
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

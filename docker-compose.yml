@@ -29,7 +29,7 @@ services:
       cart-service:
         condition: service_started
     networks:
-      - ecommerce-network
+      - services-network
 
   user-service:
     container_name: user-service
@@ -43,11 +43,13 @@ services:
       USER_SERVICE_GRPC_PORT: ${USER_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${USER_POSTGRES_USER}:${USER_POSTGRES_PASSWORD}@user-db:5432/${USER_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
+      LOG_LEVEL: ${LOG_LEVEL}
     depends_on:
       user-db:
         condition: service_healthy
     networks:
-      - ecommerce-network
+      - services-network
+      - user-db-network
 
   product-service:
     container_name: product-service
@@ -61,11 +63,13 @@ services:
       PRODUCT_SERVICE_GRPC_PORT: ${PRODUCT_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${PRODUCT_POSTGRES_USER}:${PRODUCT_POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
+      LOG_LEVEL: ${LOG_LEVEL}
     depends_on:
       product-db:
         condition: service_healthy
     networks:
-      - ecommerce-network
+      - services-network
+      - product-db-network
 
   cart-service:
     container_name: cart-service
@@ -80,13 +84,15 @@ services:
       DATABASE_URL: postgres://${CART_POSTGRES_USER}:${CART_POSTGRES_PASSWORD}@cart-db:5432/${CART_POSTGRES_DB}?sslmode=disable
       MIGRATIONS_DIR: /migrations
       PRODUCT_SERVICE_GRPC_URL: ${PRODUCT_SERVICE_GRPC_URL}
+      LOG_LEVEL: ${LOG_LEVEL}
     depends_on:
       cart-db:
         condition: service_healthy
       product-service:
         condition: service_started
     networks:
-      - ecommerce-network
+      - services-network
+      - cart-db-network
 
   user-db:
     image: postgres:18-alpine
@@ -101,7 +107,7 @@ services:
     volumes:
       - user_db_data:/var/lib/postgresql/data
     networks:
-      - ecommerce-network
+      - user-db-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${USER_POSTGRES_USER} -d ${USER_POSTGRES_DB}"]
       interval: 5s
@@ -121,7 +127,7 @@ services:
     volumes:
       - product_db_data:/var/lib/postgresql/data
     networks:
-      - ecommerce-network
+      - product-db-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PRODUCT_POSTGRES_USER} -d ${PRODUCT_POSTGRES_DB}"]
       interval: 5s
@@ -141,7 +147,7 @@ services:
     volumes:
       - cart_db_data:/var/lib/postgresql/data
     networks:
-      - ecommerce-network
+      - cart-db-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${CART_POSTGRES_USER} -d ${CART_POSTGRES_DB}"]
       interval: 5s
@@ -165,12 +171,20 @@ services:
       cart-db:
         condition: service_healthy
     networks:
-      - ecommerce-network
+      - user-db-network
+      - product-db-network
+      - cart-db-network
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
 networks:
-  ecommerce-network:
+  services-network:
+    driver: bridge
+  user-db-network:
+    driver: bridge
+  product-db-network:
+    driver: bridge
+  cart-db-network:
     driver: bridge
 
 volumes:

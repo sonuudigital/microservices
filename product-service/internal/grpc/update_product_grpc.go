@@ -26,7 +26,6 @@ func (s *GRPCServer) UpdateProduct(ctx context.Context, req *productv1.UpdatePro
 		ID:            uid,
 		Name:          req.Name,
 		Description:   pgtype.Text{String: req.Description, Valid: true},
-		Code:          req.Code,
 		StockQuantity: req.StockQuantity,
 	}
 	if err := params.Price.Scan(fmt.Sprintf("%f", req.Price)); err != nil {

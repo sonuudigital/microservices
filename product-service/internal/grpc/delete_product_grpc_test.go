@@ -23,7 +23,7 @@ func TestDeleteProduct(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).Return(repository.Product{}, nil).Once()
 		mockQuerier.On("DeleteProduct", mock.Anything, pgUUID).Return(nil).Once()
 
@@ -35,7 +35,7 @@ func TestDeleteProduct(t *testing.T) {
 
 	t.Run("Not Found", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).Return(repository.Product{}, pgx.ErrNoRows).Once()
 
 		_, err := server.DeleteProduct(context.Background(), req)
@@ -49,7 +49,7 @@ func TestDeleteProduct(t *testing.T) {
 
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
