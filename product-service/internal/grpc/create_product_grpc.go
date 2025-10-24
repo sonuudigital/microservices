@@ -17,9 +17,8 @@ func (s *GRPCServer) CreateProduct(ctx context.Context, req *productv1.CreatePro
 	}
 
 	params := repository.CreateProductParams{
-		Name:        req.Name,
-		Description: pgtype.Text{String: req.Description, Valid: true},
-		Code:        req.Code,
+		Name:          req.Name,
+		Description:   pgtype.Text{String: req.Description, Valid: true},
 		StockQuantity: req.StockQuantity,
 	}
 	if err := params.Price.Scan(fmt.Sprintf("%f", req.Price)); err != nil {

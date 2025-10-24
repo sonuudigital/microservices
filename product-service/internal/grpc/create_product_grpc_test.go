@@ -16,16 +16,15 @@ import (
 
 func TestCreateProduct(t *testing.T) {
 	req := &productv1.CreateProductRequest{
-		Name:        "Test Product",
-		Description: "Test Description",
-		Price:       99.99,
-		Code:        "TEST001",
+		Name:          "Test Product",
+		Description:   "Test Description",
+		Price:         99.99,
 		StockQuantity: 100,
 	}
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		mockQuerier.On("CreateProduct", mock.Anything, mock.AnythingOfType("repository.CreateProductParams")).
 			Return(repository.Product{Name: req.Name}, nil).Once()
 
@@ -39,7 +38,7 @@ func TestCreateProduct(t *testing.T) {
 
 	t.Run("DB Error", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		mockQuerier.On("CreateProduct", mock.Anything, mock.AnythingOfType("repository.CreateProductParams")).
 			Return(repository.Product{}, errors.New("db error")).Once()
 
@@ -55,7 +54,7 @@ func TestCreateProduct(t *testing.T) {
 
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

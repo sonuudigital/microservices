@@ -16,17 +16,16 @@ import (
 
 func TestUpdateProduct(t *testing.T) {
 	req := &productv1.UpdateProductRequest{
-		Id:          uuidTest,
-		Name:        "Updated Product",
-		Description: "Updated Description",
-		Price:       129.99,
-		Code:        "UPDATED001",
+		Id:            uuidTest,
+		Name:          "Updated Product",
+		Description:   "Updated Description",
+		Price:         129.99,
 		StockQuantity: 50,
 	}
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		mockQuerier.On("UpdateProduct", mock.Anything, mock.AnythingOfType("repository.UpdateProductParams")).
 			Return(repository.Product{ID: pgtype.UUID{Bytes: [16]byte{}, Valid: true}, Name: req.Name}, nil).Once()
 
@@ -40,7 +39,7 @@ func TestUpdateProduct(t *testing.T) {
 
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier)
+		server := grpc_server.NewServer(mockQuerier)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

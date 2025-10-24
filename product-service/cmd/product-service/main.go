@@ -52,7 +52,7 @@ func startGRPCServer(pgDb *pgxpool.Pool, logger logs.Logger) {
 
 	queries := repository.New(pgDb)
 	grpcServer := grpc.NewServer()
-	productServer := grpc_server.NewGRPCServer(queries)
+	productServer := grpc_server.NewServer(queries)
 	productv1.RegisterProductServiceServer(grpcServer, productServer)
 
 	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
