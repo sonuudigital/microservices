@@ -28,10 +28,5 @@ func (s *GRPCServer) GetProductsByIDs(ctx context.Context, req *productv1.GetPro
 		return nil, status.Errorf(codes.Internal, "failed to get products: %v", err)
 	}
 
-	grpcProducts := make([]*productv1.Product, len(dbProducts))
-	for i, p := range dbProducts {
-		grpcProducts[i] = toGRPCProduct(p)
-	}
-
-	return &productv1.GetProductsByIDsResponse{Products: grpcProducts}, nil
+	return &productv1.GetProductsByIDsResponse{Products: toGRPCProducts(dbProducts)}, nil
 }

@@ -76,6 +76,14 @@ func (m *mockProductServiceClient) DeleteProduct(ctx context.Context, in *produc
 	return args.Get(0).(*emptypb.Empty), args.Error(1)
 }
 
+func (m *mockProductServiceClient) GetProductsByCategoryID(ctx context.Context, in *productv1.GetProductsByCategoryIDRequest, opts ...grpc.CallOption) (*productv1.GetProductsByCategoryIDResponse, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*productv1.GetProductsByCategoryIDResponse), args.Error(1)
+}
+
 func TestGetProductHandler(t *testing.T) {
 	logger := logs.NewSlogLogger()
 	mockClient := new(mockProductServiceClient)

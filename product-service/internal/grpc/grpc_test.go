@@ -60,3 +60,11 @@ func (m *MockQuerier) GetProductsByIDs(ctx context.Context, productIds []pgtype.
 	}
 	return nil, args.Error(1)
 }
+
+func (m *MockQuerier) GetProductsByCategoryID(ctx context.Context, categoryID pgtype.UUID) ([]repository.Product, error) {
+	args := m.Called(ctx, categoryID)
+	if p, ok := args.Get(0).([]repository.Product); ok {
+		return p, args.Error(1)
+	}
+	return nil, args.Error(1)
+}

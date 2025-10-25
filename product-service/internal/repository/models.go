@@ -10,11 +10,18 @@ import (
 
 type Product struct {
 	ID            pgtype.UUID        `json:"id"`
+	CategoryID    pgtype.UUID        `json:"categoryId"`
 	Name          string             `json:"name"`
 	Description   pgtype.Text        `json:"description"`
-	Code          string             `json:"code"`
 	Price         pgtype.Numeric     `json:"price"`
 	CreatedAt     pgtype.Timestamptz `json:"createdAt"`
 	StockQuantity int32              `json:"stockQuantity"`
 	UpdatedAt     pgtype.Timestamptz `json:"updatedAt"`
+}
+
+type ProductCategory struct {
+	ID          pgtype.UUID        `json:"id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	CreatedAt   pgtype.Timestamptz `json:"createdAt"`
 }

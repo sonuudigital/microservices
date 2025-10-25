@@ -14,6 +14,7 @@ service ProductService {
   rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
   rpc UpdateProduct(UpdateProductRequest) returns (Product);
   rpc DeleteProduct(DeleteProductRequest) returns (google.protobuf.Empty);
+  rpc GetProductsByCategoryID(GetProductsByCategoryIDRequest) returns (GetProductsByCategoryIDResponse);
 }
 
 message Product {
@@ -64,4 +65,12 @@ message UpdateProductRequest {
 
 message DeleteProductRequest {
   string id = 1;
+}
+
+message GetProductsByCategoryIDRequest {
+  string category_id = 1;
+}
+
+message GetProductsByCategoryIDResponse {
+  repeated Product products = 1;
 }
