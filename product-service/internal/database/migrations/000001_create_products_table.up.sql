@@ -19,5 +19,4 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 CREATE INDEX idx_products_category_id ON products(category_id);
-CREATE INDEX idx_products_code ON products(code);
 CREATE INDEX idx_products_created_at ON products(created_at);

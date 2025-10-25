@@ -10,22 +10,24 @@ OFFSET $2;
 
 -- name: CreateProduct :one
 INSERT INTO products (
+  category_id,
   name,
   description,
   price,
   stock_quantity
 ) VALUES (
-  $1, $2, $3, $4
+  $1, $2, $3, $4, $5
 )
 RETURNING *;
 
 -- name: UpdateProduct :one
 UPDATE products
 SET
-  name = $2,
-  description = $3,
-  price = $4,
-  stock_quantity = $5,
+  category_id = $2,
+  name = $3,
+  description = $4,
+  price = $5,
+  stock_quantity = $6,
   updated_at = NOW()
 WHERE id = $1
 RETURNING *;

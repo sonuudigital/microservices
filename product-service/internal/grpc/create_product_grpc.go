@@ -16,7 +16,13 @@ func (s *GRPCServer) CreateProduct(ctx context.Context, req *productv1.CreatePro
 		return nil, status.FromContextError(err).Err()
 	}
 
+	var categoryUUID pgtype.UUID
+	if err := categoryUUID.Scan(req.CategoryId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid category ID: %v", err)
+	}
+
 	params := repository.CreateProductParams{
+		CategoryID:    categoryUUID,
 		Name:          req.Name,
 		Description:   pgtype.Text{String: req.Description, Valid: true},
 		StockQuantity: req.StockQuantity,

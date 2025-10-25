@@ -25,6 +25,7 @@ func NewProductHandler(logger logs.Logger, productClient productv1.ProductServic
 }
 
 type ProductRequest struct {
+	CategoryID    string  `json:"categoryId"`
 	Name          string  `json:"name"`
 	Description   string  `json:"description"`
 	Price         float64 `json:"price"`
@@ -40,6 +41,7 @@ func (h *ProductHandler) CreateProductHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	grpcReq := &productv1.CreateProductRequest{
+		CategoryId:    req.CategoryID,
 		Name:          req.Name,
 		Description:   req.Description,
 		Price:         req.Price,
@@ -113,6 +115,7 @@ func (h *ProductHandler) UpdateProductHandler(w http.ResponseWriter, r *http.Req
 
 	grpcReq := &productv1.UpdateProductRequest{
 		Id:            id,
+		CategoryId:    req.CategoryID,
 		Name:          req.Name,
 		Description:   req.Description,
 		Price:         req.Price,

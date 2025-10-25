@@ -17,6 +17,7 @@ import (
 func TestUpdateProduct(t *testing.T) {
 	req := &productv1.UpdateProductRequest{
 		Id:            uuidTest,
+		CategoryId:    "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22",
 		Name:          "Updated Product",
 		Description:   "Updated Description",
 		Price:         129.99,

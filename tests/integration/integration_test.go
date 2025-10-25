@@ -175,6 +175,7 @@ func TestProductCRUD(t *testing.T) {
 
 	t.Run("Create Product", func(t *testing.T) {
 		productReq := Product{
+			CategoryID:    "a1eebc99-9c0b-4ef8-bb6d-6bb9bd380b11",
 			Name:          "Laptop Gamer",
 			Description:   "The best laptop for gaming",
 			Price:         2500.50,
