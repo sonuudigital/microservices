@@ -22,8 +22,14 @@ func (s *GRPCServer) UpdateProduct(ctx context.Context, req *productv1.UpdatePro
 		return nil, status.Errorf(codes.InvalidArgument, "invalid product id format: %s", req.Id)
 	}
 
+	var categoryUUID pgtype.UUID
+	if err := categoryUUID.Scan(req.CategoryId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid category ID: %v", err)
+	}
+
 	params := repository.UpdateProductParams{
 		ID:            uid,
+		CategoryID:    categoryUUID,
 		Name:          req.Name,
 		Description:   pgtype.Text{String: req.Description, Valid: true},
 		StockQuantity: req.StockQuantity,

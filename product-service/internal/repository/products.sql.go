@@ -13,17 +13,19 @@ import (
 
 const createProduct = `-- name: CreateProduct :one
 INSERT INTO products (
+  category_id,
   name,
   description,
   price,
   stock_quantity
 ) VALUES (
-  $1, $2, $3, $4
+  $1, $2, $3, $4, $5
 )
 RETURNING id, category_id, name, description, price, created_at, stock_quantity, updated_at
 `
 
 type CreateProductParams struct {
+	CategoryID    pgtype.UUID    `json:"categoryId"`
 	Name          string         `json:"name"`
 	Description   pgtype.Text    `json:"description"`
 	Price         pgtype.Numeric `json:"price"`
@@ -32,6 +34,7 @@ type CreateProductParams struct {
 
 func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error) {
 	row := q.db.QueryRow(ctx, createProduct,
+		arg.CategoryID,
 		arg.Name,
 		arg.Description,
 		arg.Price,
@@ -195,10 +198,11 @@ func (q *Queries) ListProductsPaginated(ctx context.Context, arg ListProductsPag
 const updateProduct = `-- name: UpdateProduct :one
 UPDATE products
 SET
-  name = $2,
-  description = $3,
-  price = $4,
-  stock_quantity = $5,
+  category_id = $2,
+  name = $3,
+  description = $4,
+  price = $5,
+  stock_quantity = $6,
   updated_at = NOW()
 WHERE id = $1
 RETURNING id, category_id, name, description, price, created_at, stock_quantity, updated_at
@@ -206,6 +210,7 @@ RETURNING id, category_id, name, description, price, created_at, stock_quantity,
 
 type UpdateProductParams struct {
 	ID            pgtype.UUID    `json:"id"`
+	CategoryID    pgtype.UUID    `json:"categoryId"`
 	Name          string         `json:"name"`
 	Description   pgtype.Text    `json:"description"`
 	Price         pgtype.Numeric `json:"price"`
@@ -215,6 +220,7 @@ type UpdateProductParams struct {
 func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error) {
 	row := q.db.QueryRow(ctx, updateProduct,
 		arg.ID,
+		arg.CategoryID,
 		arg.Name,
 		arg.Description,
 		arg.Price,

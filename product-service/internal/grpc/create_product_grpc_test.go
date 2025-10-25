@@ -16,6 +16,7 @@ import (
 
 func TestCreateProduct(t *testing.T) {
 	req := &productv1.CreateProductRequest{
+		CategoryId:    "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22",
 		Name:          "Test Product",
 		Description:   "Test Description",
 		Price:         99.99,
