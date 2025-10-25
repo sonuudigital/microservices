@@ -12,12 +12,16 @@ import (
 
 type Querier interface {
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
+	CreateProductCategory(ctx context.Context, arg CreateProductCategoryParams) (ProductCategory, error)
 	DeleteProduct(ctx context.Context, id pgtype.UUID) error
+	DeleteProductCategory(ctx context.Context, id pgtype.UUID) error
 	GetProduct(ctx context.Context, id pgtype.UUID) (Product, error)
+	GetProductCategories(ctx context.Context) ([]ProductCategory, error)
 	GetProductsByCategoryID(ctx context.Context, categoryID pgtype.UUID) ([]Product, error)
 	GetProductsByIDs(ctx context.Context, productIds []pgtype.UUID) ([]Product, error)
 	ListProductsPaginated(ctx context.Context, arg ListProductsPaginatedParams) ([]Product, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
+	UpdateProductCategory(ctx context.Context, arg UpdateProductCategoryParams) error
 }
 
 var _ Querier = (*Queries)(nil)

@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package product_categories.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/sonuudigital/microservices/gen/product-categories/v1;product_categoriesv1";
+
+service ProductCategoriesService {
+  rpc GetProductCategories(google.protobuf.Empty) returns (ProductCategory);
+  rpc CreateProductCategory(CreateProductCategoryRequest) returns (ProductCategory);
+  rpc UpdateProductCategory(UpdateProductCategoryRequest) returns (ProductCategory);
+  rpc DeleteProductCategory(DeleteProductCategoryRequest) returns (google.protobuf.Empty);
+}
+
+message CreateProductCategoryRequest {
+    string name = 1;
+    string description = 2;
+}
+
+message UpdateProductCategoryRequest {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+}
+
+message DeleteProductCategoryRequest {
+    string id = 1;
+}
+
+message ProductCategory {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message GetProductCategoriesResponse {
+  repeated ProductCategory categories = 1;
+}

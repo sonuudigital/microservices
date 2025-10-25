@@ -68,3 +68,29 @@ func (m *MockQuerier) GetProductsByCategoryID(ctx context.Context, categoryID pg
 	}
 	return nil, args.Error(1)
 }
+
+func (m *MockQuerier) GetProductCategories(ctx context.Context) ([]repository.ProductCategory, error) {
+	args := m.Called(ctx)
+	if p, ok := args.Get(0).([]repository.ProductCategory); ok {
+		return p, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuerier) CreateProductCategory(ctx context.Context, arg repository.CreateProductCategoryParams) (repository.ProductCategory, error) {
+	args := m.Called(ctx, arg)
+	if p, ok := args.Get(0).(repository.ProductCategory); ok {
+		return p, args.Error(1)
+	}
+	return repository.ProductCategory{}, args.Error(1)
+}
+
+func (m *MockQuerier) UpdateProductCategory(ctx context.Context, arg repository.UpdateProductCategoryParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) DeleteProductCategory(ctx context.Context, id pgtype.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
