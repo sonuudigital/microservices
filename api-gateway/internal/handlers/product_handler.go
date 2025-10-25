@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -145,4 +146,47 @@ func (h *ProductHandler) DeleteProductHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ProductHandler) GetProductsByCategoryIDHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if ctx.Err() != nil {
+		ctxErr := ctx.Err()
+		switch ctxErr {
+		case context.Canceled:
+			h.logger.Warn("request canceled by the client", "error", ctxErr)
+			web.RespondWithError(w, h.logger, r, http.StatusRequestTimeout, "Request Canceled", "the request was canceled by the client")
+		case context.DeadlineExceeded:
+			h.logger.Warn("request deadline exceeded", "error", ctxErr)
+			web.RespondWithError(w, h.logger, r, http.StatusGatewayTimeout, "Deadline Exceeded", "the request deadline was exceeded")
+		default:
+			h.logger.Error("context error", "error", ctxErr)
+			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, "Internal Server Error", "an internal server error occurred")
+		}
+	}
+
+	categoryID := r.PathValue("categoryId")
+	if categoryID == "" {
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Category ID is required", "missing category ID")
+		return
+	}
+
+	grpcReq := &productv1.GetProductsByCategoryIDRequest{
+		CategoryId: categoryID,
+	}
+
+	resp, err := h.productClient.GetProductsByCategoryID(r.Context(), grpcReq)
+	if err != nil {
+		st, ok := status.FromError(err)
+		if !ok {
+			h.logger.Error("failed to parse gRPC error status", "error", err)
+			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, "Internal Server Error", "an internal server error occurred")
+			return
+		}
+		h.logger.Error("failed to get products by category ID via gRPC", "error", st.Message())
+		web.RespondWithGRPCError(w, r, st, h.logger)
+		return
+	}
+
+	web.RespondWithJSON(w, h.logger, http.StatusOK, resp.Products)
 }

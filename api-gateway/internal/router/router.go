@@ -50,6 +50,7 @@ func configAuthAndUserRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandl
 func configProductRoutes(mux *http.ServeMux, productHandler *handlers.ProductHandler, authMiddleware authMiddleware) {
 	mux.HandleFunc("GET /api/products/{id}", productHandler.GetProductHandler)
 	mux.HandleFunc("GET /api/products", productHandler.ListProductsHandler)
+	mux.HandleFunc("GET /api/products/category/{categoryId}", productHandler.GetProductsByCategoryIDHandler)
 	mux.Handle("POST /api/products", authMiddleware(http.HandlerFunc(productHandler.CreateProductHandler)))
 	mux.Handle("PUT /api/products/{id}", authMiddleware(http.HandlerFunc(productHandler.UpdateProductHandler)))
 	mux.Handle("DELETE /api/products/{id}", authMiddleware(http.HandlerFunc(productHandler.DeleteProductHandler)))

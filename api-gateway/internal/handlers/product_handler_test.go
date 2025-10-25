@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	productIdTest   = "product-123"
-	apiProductsPath = "/api/products/"
+	productIdTest             = "product-123"
+	apiProductsPath           = "/api/products/"
+	apiProductsByCategoryPath = "/api/products/category/"
 )
 
 type mockProductServiceClient struct {
@@ -208,6 +209,87 @@ func TestDeleteProductHandler(t *testing.T) {
 		handler.DeleteProductHandler(rr, req)
 
 		assert.Equal(t, http.StatusNoContent, rr.Code)
+		mockClient.AssertExpectations(t)
+	})
+}
+
+func TestGetProductsByCategoryIDHandler(t *testing.T) {
+	logger := logs.NewSlogLogger()
+	mockClient := new(mockProductServiceClient)
+	handler := handlers.NewProductHandler(logger, mockClient)
+
+	t.Run("Success", func(t *testing.T) {
+		categoryID := "category-123"
+		mockClient.On("GetProductsByCategoryID", mock.Anything, &productv1.GetProductsByCategoryIDRequest{CategoryId: categoryID}).
+			Return(&productv1.GetProductsByCategoryIDResponse{Products: []*productv1.Product{}}, nil).Once()
+
+		req, _ := http.NewRequest("GET", apiProductsByCategoryPath+categoryID, nil)
+		req.SetPathValue("categoryId", categoryID)
+		rr := httptest.NewRecorder()
+
+		handler.GetProductsByCategoryIDHandler(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("Not Found", func(t *testing.T) {
+		categoryID := "category-404"
+		mockClient.On("GetProductsByCategoryID", mock.Anything, &productv1.GetProductsByCategoryIDRequest{CategoryId: categoryID}).
+			Return(nil, status.Error(codes.NotFound, "not found")).Once()
+
+		req, _ := http.NewRequest("GET", apiProductsByCategoryPath+categoryID, nil)
+		req.SetPathValue("categoryId", categoryID)
+		rr := httptest.NewRecorder()
+
+		handler.GetProductsByCategoryIDHandler(rr, req)
+
+		assert.Equal(t, http.StatusNotFound, rr.Code)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("Context Canceled", func(t *testing.T) {
+		categoryID := "category-canceled"
+		mockClient.On("GetProductsByCategoryID", mock.Anything, &productv1.GetProductsByCategoryIDRequest{CategoryId: categoryID}).
+			Return(nil, status.Error(codes.Canceled, "context canceled")).Once()
+
+		req, _ := http.NewRequest("GET", apiProductsByCategoryPath+categoryID, nil)
+		req.SetPathValue("categoryId", categoryID)
+		rr := httptest.NewRecorder()
+
+		handler.GetProductsByCategoryIDHandler(rr, req)
+
+		assert.Equal(t, http.StatusRequestTimeout, rr.Code)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("Context Deadline Exceeded", func(t *testing.T) {
+		categoryID := "category-deadline"
+		mockClient.On("GetProductsByCategoryID", mock.Anything, &productv1.GetProductsByCategoryIDRequest{CategoryId: categoryID}).
+			Return(nil, status.Error(codes.DeadlineExceeded, "deadline exceeded")).Once()
+
+		req, _ := http.NewRequest("GET", apiProductsByCategoryPath+categoryID, nil)
+		req.SetPathValue("categoryId", categoryID)
+		rr := httptest.NewRecorder()
+
+		handler.GetProductsByCategoryIDHandler(rr, req)
+
+		assert.Equal(t, http.StatusGatewayTimeout, rr.Code)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("Internal Server Error", func(t *testing.T) {
+		categoryID := "category-error"
+		mockClient.On("GetProductsByCategoryID", mock.Anything, &productv1.GetProductsByCategoryIDRequest{CategoryId: categoryID}).
+			Return(nil, status.Error(codes.Internal, "internal error")).Once()
+
+		req, _ := http.NewRequest("GET", apiProductsByCategoryPath+categoryID, nil)
+		req.SetPathValue("categoryId", categoryID)
+		rr := httptest.NewRecorder()
+
+		handler.GetProductsByCategoryIDHandler(rr, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
 		mockClient.AssertExpectations(t)
 	})
 }

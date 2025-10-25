@@ -40,6 +40,7 @@ type LoginResponse struct {
 
 type Product struct {
 	ID            string  `json:"id"`
+	CategoryID    string  `json:"categoryId"`
 	Name          string  `json:"name"`
 	Description   string  `json:"description"`
 	Price         float64 `json:"price"`
@@ -220,6 +221,26 @@ func TestProductCRUD(t *testing.T) {
 		err = json.NewDecoder(resp.Body).Decode(&fetchedProduct)
 		require.NoError(err)
 		assert.Equal(createdProduct.ID, fetchedProduct.ID)
+	})
+
+	t.Run("Get Products By Category", func(t *testing.T) {
+		require.NotEmpty(createdProduct.ID, createProductStepMsg)
+
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/products/category/%s", apiGatewayURL, createdProduct.CategoryID), nil)
+		require.NoError(err)
+		req.Header.Set("Authorization", bearerWithSpace+authToken)
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		require.NoError(err)
+		defer resp.Body.Close()
+
+		assert.Equal(http.StatusOK, resp.StatusCode)
+
+		var products []Product
+		err = json.NewDecoder(resp.Body).Decode(&products)
+		require.NoError(err)
+		assert.GreaterOrEqual(len(products), 1)
 	})
 
 	t.Run("Update Product", func(t *testing.T) {

@@ -126,7 +126,7 @@ func HTTPStatusFromGRPC(code codes.Code) int {
 	case codes.OK:
 		return http.StatusOK
 	case codes.Canceled:
-		return 499
+		return http.StatusRequestTimeout
 	case codes.Unknown:
 		return http.StatusInternalServerError
 	case codes.InvalidArgument:
