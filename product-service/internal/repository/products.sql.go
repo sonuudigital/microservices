@@ -16,19 +16,17 @@ INSERT INTO products (
   name,
   description,
   price,
-  code,
   stock_quantity
 ) VALUES (
-  $1, $2, $3, $4, $5
+  $1, $2, $3, $4
 )
-RETURNING id, name, description, code, price, created_at, stock_quantity, updated_at
+RETURNING id, category_id, name, description, price, created_at, stock_quantity, updated_at
 `
 
 type CreateProductParams struct {
 	Name          string         `json:"name"`
 	Description   pgtype.Text    `json:"description"`
 	Price         pgtype.Numeric `json:"price"`
-	Code          string         `json:"code"`
 	StockQuantity int32          `json:"stockQuantity"`
 }
 
@@ -37,15 +35,14 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		arg.Name,
 		arg.Description,
 		arg.Price,
-		arg.Code,
 		arg.StockQuantity,
 	)
 	var i Product
 	err := row.Scan(
 		&i.ID,
+		&i.CategoryID,
 		&i.Name,
 		&i.Description,
-		&i.Code,
 		&i.Price,
 		&i.CreatedAt,
 		&i.StockQuantity,
@@ -65,7 +62,7 @@ func (q *Queries) DeleteProduct(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getProduct = `-- name: GetProduct :one
-SELECT id, name, description, code, price, created_at, stock_quantity, updated_at FROM products
+SELECT id, category_id, name, description, price, created_at, stock_quantity, updated_at FROM products
 WHERE id = $1
 `
 
@@ -74,9 +71,9 @@ func (q *Queries) GetProduct(ctx context.Context, id pgtype.UUID) (Product, erro
 	var i Product
 	err := row.Scan(
 		&i.ID,
+		&i.CategoryID,
 		&i.Name,
 		&i.Description,
-		&i.Code,
 		&i.Price,
 		&i.CreatedAt,
 		&i.StockQuantity,
@@ -85,8 +82,43 @@ func (q *Queries) GetProduct(ctx context.Context, id pgtype.UUID) (Product, erro
 	return i, err
 }
 
+const getProductsByCategoryID = `-- name: GetProductsByCategoryID :many
+SELECT id, category_id, name, description, price, created_at, stock_quantity, updated_at FROM products
+WHERE category_id = $1
+ORDER BY id
+`
+
+func (q *Queries) GetProductsByCategoryID(ctx context.Context, categoryID pgtype.UUID) ([]Product, error) {
+	rows, err := q.db.Query(ctx, getProductsByCategoryID, categoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Product
+	for rows.Next() {
+		var i Product
+		if err := rows.Scan(
+			&i.ID,
+			&i.CategoryID,
+			&i.Name,
+			&i.Description,
+			&i.Price,
+			&i.CreatedAt,
+			&i.StockQuantity,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProductsByIDs = `-- name: GetProductsByIDs :many
-SELECT id, name, description, code, price, created_at, stock_quantity, updated_at FROM products
+SELECT id, category_id, name, description, price, created_at, stock_quantity, updated_at FROM products
 WHERE id = ANY($1::uuid[])
 `
 
@@ -101,9 +133,9 @@ func (q *Queries) GetProductsByIDs(ctx context.Context, productIds []pgtype.UUID
 		var i Product
 		if err := rows.Scan(
 			&i.ID,
+			&i.CategoryID,
 			&i.Name,
 			&i.Description,
-			&i.Code,
 			&i.Price,
 			&i.CreatedAt,
 			&i.StockQuantity,
@@ -120,7 +152,7 @@ func (q *Queries) GetProductsByIDs(ctx context.Context, productIds []pgtype.UUID
 }
 
 const listProductsPaginated = `-- name: ListProductsPaginated :many
-SELECT id, name, description, code, price, created_at, stock_quantity, updated_at FROM products
+SELECT id, category_id, name, description, price, created_at, stock_quantity, updated_at FROM products
 ORDER BY name
 LIMIT $1
 OFFSET $2
@@ -142,9 +174,9 @@ func (q *Queries) ListProductsPaginated(ctx context.Context, arg ListProductsPag
 		var i Product
 		if err := rows.Scan(
 			&i.ID,
+			&i.CategoryID,
 			&i.Name,
 			&i.Description,
-			&i.Code,
 			&i.Price,
 			&i.CreatedAt,
 			&i.StockQuantity,
@@ -166,11 +198,10 @@ SET
   name = $2,
   description = $3,
   price = $4,
-  code = $5,
-  stock_quantity = $6,
+  stock_quantity = $5,
   updated_at = NOW()
 WHERE id = $1
-RETURNING id, name, description, code, price, created_at, stock_quantity, updated_at
+RETURNING id, category_id, name, description, price, created_at, stock_quantity, updated_at
 `
 
 type UpdateProductParams struct {
@@ -178,7 +209,6 @@ type UpdateProductParams struct {
 	Name          string         `json:"name"`
 	Description   pgtype.Text    `json:"description"`
 	Price         pgtype.Numeric `json:"price"`
-	Code          string         `json:"code"`
 	StockQuantity int32          `json:"stockQuantity"`
 }
 
@@ -188,15 +218,14 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 		arg.Name,
 		arg.Description,
 		arg.Price,
-		arg.Code,
 		arg.StockQuantity,
 	)
 	var i Product
 	err := row.Scan(
 		&i.ID,
+		&i.CategoryID,
 		&i.Name,
 		&i.Description,
-		&i.Code,
 		&i.Price,
 		&i.CreatedAt,
 		&i.StockQuantity,

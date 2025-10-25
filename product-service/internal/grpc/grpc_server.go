@@ -45,3 +45,11 @@ func toGRPCProduct(p repository.Product) *productv1.Product {
 		UpdatedAt:     updatedAt,
 	}
 }
+
+func toGRPCProducts(products []repository.Product) []*productv1.Product {
+	grpcProducts := make([]*productv1.Product, len(products))
+	for i, p := range products {
+		grpcProducts[i] = toGRPCProduct(p)
+	}
+	return grpcProducts
+}

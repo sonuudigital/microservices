@@ -37,3 +37,8 @@ WHERE id = $1;
 -- name: GetProductsByIDs :many
 SELECT * FROM products
 WHERE id = ANY(@product_ids::uuid[]);
+
+-- name: GetProductsByCategoryID :many
+SELECT * FROM products
+WHERE category_id = $1
+ORDER BY id;

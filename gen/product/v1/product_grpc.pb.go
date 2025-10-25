@@ -20,12 +20,13 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	ProductService_GetProductsByIDs_FullMethodName = "/product.v1.ProductService/GetProductsByIDs"
-	ProductService_CreateProduct_FullMethodName    = "/product.v1.ProductService/CreateProduct"
-	ProductService_GetProduct_FullMethodName       = "/product.v1.ProductService/GetProduct"
-	ProductService_ListProducts_FullMethodName     = "/product.v1.ProductService/ListProducts"
-	ProductService_UpdateProduct_FullMethodName    = "/product.v1.ProductService/UpdateProduct"
-	ProductService_DeleteProduct_FullMethodName    = "/product.v1.ProductService/DeleteProduct"
+	ProductService_GetProductsByIDs_FullMethodName        = "/product.v1.ProductService/GetProductsByIDs"
+	ProductService_CreateProduct_FullMethodName           = "/product.v1.ProductService/CreateProduct"
+	ProductService_GetProduct_FullMethodName              = "/product.v1.ProductService/GetProduct"
+	ProductService_ListProducts_FullMethodName            = "/product.v1.ProductService/ListProducts"
+	ProductService_UpdateProduct_FullMethodName           = "/product.v1.ProductService/UpdateProduct"
+	ProductService_DeleteProduct_FullMethodName           = "/product.v1.ProductService/DeleteProduct"
+	ProductService_GetProductsByCategoryID_FullMethodName = "/product.v1.ProductService/GetProductsByCategoryID"
 )
 
 // ProductServiceClient is the client API for ProductService service.
@@ -38,6 +39,7 @@ type ProductServiceClient interface {
 	ListProducts(ctx context.Context, in *ListProductsRequest, opts ...grpc.CallOption) (*ListProductsResponse, error)
 	UpdateProduct(ctx context.Context, in *UpdateProductRequest, opts ...grpc.CallOption) (*Product, error)
 	DeleteProduct(ctx context.Context, in *DeleteProductRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetProductsByCategoryID(ctx context.Context, in *GetProductsByCategoryIDRequest, opts ...grpc.CallOption) (*GetProductsByCategoryIDResponse, error)
 }
 
 type productServiceClient struct {
@@ -108,6 +110,16 @@ func (c *productServiceClient) DeleteProduct(ctx context.Context, in *DeleteProd
 	return out, nil
 }
 
+func (c *productServiceClient) GetProductsByCategoryID(ctx context.Context, in *GetProductsByCategoryIDRequest, opts ...grpc.CallOption) (*GetProductsByCategoryIDResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProductsByCategoryIDResponse)
+	err := c.cc.Invoke(ctx, ProductService_GetProductsByCategoryID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProductServiceServer is the server API for ProductService service.
 // All implementations must embed UnimplementedProductServiceServer
 // for forward compatibility
@@ -118,6 +130,7 @@ type ProductServiceServer interface {
 	ListProducts(context.Context, *ListProductsRequest) (*ListProductsResponse, error)
 	UpdateProduct(context.Context, *UpdateProductRequest) (*Product, error)
 	DeleteProduct(context.Context, *DeleteProductRequest) (*emptypb.Empty, error)
+	GetProductsByCategoryID(context.Context, *GetProductsByCategoryIDRequest) (*GetProductsByCategoryIDResponse, error)
 	mustEmbedUnimplementedProductServiceServer()
 }
 
@@ -142,6 +155,9 @@ func (UnimplementedProductServiceServer) UpdateProduct(context.Context, *UpdateP
 }
 func (UnimplementedProductServiceServer) DeleteProduct(context.Context, *DeleteProductRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteProduct not implemented")
+}
+func (UnimplementedProductServiceServer) GetProductsByCategoryID(context.Context, *GetProductsByCategoryIDRequest) (*GetProductsByCategoryIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProductsByCategoryID not implemented")
 }
 func (UnimplementedProductServiceServer) mustEmbedUnimplementedProductServiceServer() {}
 
@@ -264,6 +280,24 @@ func _ProductService_DeleteProduct_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductService_GetProductsByCategoryID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProductsByCategoryIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).GetProductsByCategoryID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_GetProductsByCategoryID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).GetProductsByCategoryID(ctx, req.(*GetProductsByCategoryIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProductService_ServiceDesc is the grpc.ServiceDesc for ProductService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -294,6 +328,10 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteProduct",
 			Handler:    _ProductService_DeleteProduct_Handler,
+		},
+		{
+			MethodName: "GetProductsByCategoryID",
+			Handler:    _ProductService_GetProductsByCategoryID_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
