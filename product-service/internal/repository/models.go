@@ -24,4 +24,5 @@ type ProductCategory struct {
 	Name        string             `json:"name"`
 	Description pgtype.Text        `json:"description"`
 	CreatedAt   pgtype.Timestamptz `json:"createdAt"`
+	UpdatedAt   pgtype.Timestamptz `json:"updatedAt"`
 }

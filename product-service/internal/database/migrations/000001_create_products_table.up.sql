@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS product_categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     description TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NULL
 );
 
 CREATE TABLE IF NOT EXISTS products (
@@ -17,6 +18,8 @@ CREATE TABLE IF NOT EXISTS products (
     stock_quantity INTEGER NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NULL
 );
+
+CREATE INDEX idx_product_categories_name ON product_categories(name);
 
 CREATE INDEX idx_products_category_id ON products(category_id);
 CREATE INDEX idx_products_created_at ON products(created_at);
