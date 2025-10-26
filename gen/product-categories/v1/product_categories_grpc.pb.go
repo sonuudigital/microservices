@@ -30,7 +30,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProductCategoriesServiceClient interface {
-	GetProductCategories(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ProductCategory, error)
+	GetProductCategories(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetProductCategoriesResponse, error)
 	CreateProductCategory(ctx context.Context, in *CreateProductCategoryRequest, opts ...grpc.CallOption) (*ProductCategory, error)
 	UpdateProductCategory(ctx context.Context, in *UpdateProductCategoryRequest, opts ...grpc.CallOption) (*ProductCategory, error)
 	DeleteProductCategory(ctx context.Context, in *DeleteProductCategoryRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -44,9 +44,9 @@ func NewProductCategoriesServiceClient(cc grpc.ClientConnInterface) ProductCateg
 	return &productCategoriesServiceClient{cc}
 }
 
-func (c *productCategoriesServiceClient) GetProductCategories(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ProductCategory, error) {
+func (c *productCategoriesServiceClient) GetProductCategories(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetProductCategoriesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ProductCategory)
+	out := new(GetProductCategoriesResponse)
 	err := c.cc.Invoke(ctx, ProductCategoriesService_GetProductCategories_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (c *productCategoriesServiceClient) DeleteProductCategory(ctx context.Conte
 // All implementations must embed UnimplementedProductCategoriesServiceServer
 // for forward compatibility
 type ProductCategoriesServiceServer interface {
-	GetProductCategories(context.Context, *emptypb.Empty) (*ProductCategory, error)
+	GetProductCategories(context.Context, *emptypb.Empty) (*GetProductCategoriesResponse, error)
 	CreateProductCategory(context.Context, *CreateProductCategoryRequest) (*ProductCategory, error)
 	UpdateProductCategory(context.Context, *UpdateProductCategoryRequest) (*ProductCategory, error)
 	DeleteProductCategory(context.Context, *DeleteProductCategoryRequest) (*emptypb.Empty, error)
@@ -99,7 +99,7 @@ type ProductCategoriesServiceServer interface {
 type UnimplementedProductCategoriesServiceServer struct {
 }
 
-func (UnimplementedProductCategoriesServiceServer) GetProductCategories(context.Context, *emptypb.Empty) (*ProductCategory, error) {
+func (UnimplementedProductCategoriesServiceServer) GetProductCategories(context.Context, *emptypb.Empty) (*GetProductCategoriesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProductCategories not implemented")
 }
 func (UnimplementedProductCategoriesServiceServer) CreateProductCategory(context.Context, *CreateProductCategoryRequest) (*ProductCategory, error) {

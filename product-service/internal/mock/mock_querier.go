@@ -1,4 +1,4 @@
-package grpc_test
+package mock
 
 import (
 	"context"
@@ -6,12 +6,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/stretchr/testify/mock"
-)
-
-const (
-	uuidTest         = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-	uuidCategoryTest = "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22"
-	uuidMalformed    = "malformed-uuid"
 )
 
 type MockQuerier struct {
@@ -95,10 +89,4 @@ func (m *MockQuerier) UpdateProductCategory(ctx context.Context, arg repository.
 func (m *MockQuerier) DeleteProductCategory(ctx context.Context, id pgtype.UUID) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
-}
-
-func scanAndGetCategoryUUID() pgtype.UUID {
-	var pgUUID pgtype.UUID
-	_ = pgUUID.Scan(uuidCategoryTest)
-	return pgUUID
 }
