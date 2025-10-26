@@ -29,5 +29,5 @@ func (s *GRPCServer) GetProductsByCategoryID(ctx context.Context, req *productv1
 		return nil, status.Errorf(codes.Internal, "failed to get products by category id: %v", err)
 	}
 
-	return &productv1.GetProductsByCategoryIDResponse{Products: toGRPCProducts(products)}, nil
+	return &productv1.GetProductsByCategoryIDResponse{Products: ToGRPCProducts(products)}, nil
 }

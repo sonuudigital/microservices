@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
@@ -13,11 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-)
-
-const (
-	uuidCategoryTest = "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22"
-	uuidMalformed    = "malformed-uuid"
 )
 
 func TestGetProductsByCategoryID(t *testing.T) {
@@ -29,7 +23,7 @@ func TestGetProductsByCategoryID(t *testing.T) {
 }
 
 func testSuccess(t *testing.T) {
-	pgUUID := scanAndGetPgUUID()
+	pgUUID := scanAndGetCategoryUUID()
 	req, mockQuerier, server := initializeProductService()
 	mockQuerier.On("GetProductsByCategoryID", mock.Anything, pgUUID).Return([]repository.Product{}, nil).Once()
 
@@ -53,7 +47,7 @@ func testsMalformedUUID(t *testing.T) {
 }
 
 func testsNotFound(t *testing.T) {
-	pgUUID := scanAndGetPgUUID()
+	pgUUID := scanAndGetCategoryUUID()
 	req, mockQuerier, server := initializeProductService()
 	mockQuerier.On("GetProductsByCategoryID", mock.Anything, pgUUID).Return([]repository.Product{}, pgx.ErrNoRows).Once()
 
@@ -67,7 +61,7 @@ func testsNotFound(t *testing.T) {
 }
 
 func testDBError(t *testing.T) {
-	pgUUID := scanAndGetPgUUID()
+	pgUUID := scanAndGetCategoryUUID()
 	req, mockQuerier, server := initializeProductService()
 	mockQuerier.On("GetProductsByCategoryID", mock.Anything, pgUUID).Return([]repository.Product{}, pgx.ErrTxClosed).Once()
 
@@ -81,7 +75,7 @@ func testDBError(t *testing.T) {
 }
 
 func testContextCanceled(t *testing.T) {
-	scanAndGetPgUUID()
+	scanAndGetCategoryUUID()
 	req, mockQuerier, server := initializeProductService()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -93,12 +87,6 @@ func testContextCanceled(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, codes.Canceled, st.Code())
 	mockQuerier.AssertNotCalled(t, "GetProductsByCategoryID", mock.Anything, mock.Anything)
-}
-
-func scanAndGetPgUUID() pgtype.UUID {
-	var pgUUID pgtype.UUID
-	_ = pgUUID.Scan(uuidCategoryTest)
-	return pgUUID
 }
 
 func initializeProductService() (*productv1.GetProductsByCategoryIDRequest, *MockQuerier, *grpc.GRPCServer) {

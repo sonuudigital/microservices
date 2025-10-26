@@ -6,8 +6,10 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
+	"github.com/sonuudigital/microservices/product-service/internal/grpc/category"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
@@ -52,7 +54,11 @@ func startGRPCServer(pgDb *pgxpool.Pool, logger logs.Logger) {
 
 	queries := repository.New(pgDb)
 	grpcServer := grpc.NewServer()
+
+	categoryServer := category.New(queries)
 	productServer := grpc_server.NewServer(queries)
+
+	product_categoriesv1.RegisterProductCategoriesServiceServer(grpcServer, categoryServer)
 	productv1.RegisterProductServiceServer(grpcServer, productServer)
 
 	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
