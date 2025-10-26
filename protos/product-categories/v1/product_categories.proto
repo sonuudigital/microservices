@@ -10,7 +10,7 @@ option go_package = "github.com/sonuudigital/microservices/gen/product-categorie
 service ProductCategoriesService {
   rpc GetProductCategories(google.protobuf.Empty) returns (GetProductCategoriesResponse);
   rpc CreateProductCategory(CreateProductCategoryRequest) returns (ProductCategory);
-  rpc UpdateProductCategory(UpdateProductCategoryRequest) returns (ProductCategory);
+  rpc UpdateProductCategory(UpdateProductCategoryRequest) returns (google.protobuf.Empty);
   rpc DeleteProductCategory(DeleteProductCategoryRequest) returns (google.protobuf.Empty);
 }
 

@@ -32,7 +32,7 @@ const (
 type ProductCategoriesServiceClient interface {
 	GetProductCategories(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetProductCategoriesResponse, error)
 	CreateProductCategory(ctx context.Context, in *CreateProductCategoryRequest, opts ...grpc.CallOption) (*ProductCategory, error)
-	UpdateProductCategory(ctx context.Context, in *UpdateProductCategoryRequest, opts ...grpc.CallOption) (*ProductCategory, error)
+	UpdateProductCategory(ctx context.Context, in *UpdateProductCategoryRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	DeleteProductCategory(ctx context.Context, in *DeleteProductCategoryRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -64,9 +64,9 @@ func (c *productCategoriesServiceClient) CreateProductCategory(ctx context.Conte
 	return out, nil
 }
 
-func (c *productCategoriesServiceClient) UpdateProductCategory(ctx context.Context, in *UpdateProductCategoryRequest, opts ...grpc.CallOption) (*ProductCategory, error) {
+func (c *productCategoriesServiceClient) UpdateProductCategory(ctx context.Context, in *UpdateProductCategoryRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ProductCategory)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ProductCategoriesService_UpdateProductCategory_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (c *productCategoriesServiceClient) DeleteProductCategory(ctx context.Conte
 type ProductCategoriesServiceServer interface {
 	GetProductCategories(context.Context, *emptypb.Empty) (*GetProductCategoriesResponse, error)
 	CreateProductCategory(context.Context, *CreateProductCategoryRequest) (*ProductCategory, error)
-	UpdateProductCategory(context.Context, *UpdateProductCategoryRequest) (*ProductCategory, error)
+	UpdateProductCategory(context.Context, *UpdateProductCategoryRequest) (*emptypb.Empty, error)
 	DeleteProductCategory(context.Context, *DeleteProductCategoryRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedProductCategoriesServiceServer()
 }
@@ -105,7 +105,7 @@ func (UnimplementedProductCategoriesServiceServer) GetProductCategories(context.
 func (UnimplementedProductCategoriesServiceServer) CreateProductCategory(context.Context, *CreateProductCategoryRequest) (*ProductCategory, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateProductCategory not implemented")
 }
-func (UnimplementedProductCategoriesServiceServer) UpdateProductCategory(context.Context, *UpdateProductCategoryRequest) (*ProductCategory, error) {
+func (UnimplementedProductCategoriesServiceServer) UpdateProductCategory(context.Context, *UpdateProductCategoryRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateProductCategory not implemented")
 }
 func (UnimplementedProductCategoriesServiceServer) DeleteProductCategory(context.Context, *DeleteProductCategoryRequest) (*emptypb.Empty, error) {
