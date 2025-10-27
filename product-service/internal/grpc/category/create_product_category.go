@@ -16,6 +16,10 @@ func (s *GRPCServer) CreateProductCategory(ctx context.Context, req *product_cat
 		return nil, status.FromContextError(err).Err()
 	}
 
+	if req.Name == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "category name is required")
+	}
+
 	arg := repository.CreateProductCategoryParams{
 		Name:        req.Name,
 		Description: pgtype.Text{String: req.Description, Valid: req.Description != ""},

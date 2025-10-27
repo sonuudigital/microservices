@@ -21,10 +21,16 @@ func (s *GRPCServer) CreateProduct(ctx context.Context, req *productv1.CreatePro
 		return nil, status.Errorf(codes.InvalidArgument, "invalid category ID: %v", err)
 	}
 
+	var price pgtype.Numeric
+	if err := price.Scan(fmt.Sprintf("%f", req.Price)); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid price: %v", err)
+	}
+
 	params := repository.CreateProductParams{
 		CategoryID:    categoryUUID,
 		Name:          req.Name,
 		Description:   pgtype.Text{String: req.Description, Valid: true},
+		Price:         price,
 		StockQuantity: req.StockQuantity,
 	}
 	if err := params.Price.Scan(fmt.Sprintf("%f", req.Price)); err != nil {

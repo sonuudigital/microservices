@@ -37,6 +37,7 @@ func toGRPCProduct(p repository.Product) *productv1.Product {
 
 	return &productv1.Product{
 		Id:            p.ID.String(),
+		CategoryId:    p.CategoryID.String(),
 		Name:          p.Name,
 		Description:   p.Description.String,
 		Price:         price,

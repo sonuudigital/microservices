@@ -6,6 +6,7 @@ import (
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
+	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/auth"
@@ -20,6 +21,7 @@ func New(
 	logger logs.Logger,
 	userClient userv1.UserServiceClient,
 	productClient productv1.ProductServiceClient,
+	productCategoriesClient product_categoriesv1.ProductCategoriesServiceClient,
 	cartClient cartv1.CartServiceClient,
 ) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
@@ -32,10 +34,12 @@ func New(
 	authMw := middlewares.AuthMiddleware(jwtManager, logger)
 	userHandler := handlers.NewUserHandler(logger, userClient)
 	productHandler := handlers.NewProductHandler(logger, productClient)
+	productCategoriesHandler := handlers.NewProductCategoriesHandler(logger, productCategoriesClient)
 	cartHandler := handlers.NewCartHandler(logger, cartClient)
 
 	configAuthAndUserRoutes(mux, authHandler, userHandler, authMw)
 	configProductRoutes(mux, productHandler, authMw)
+	configProductCategoriesRoutes(mux, productCategoriesHandler, authMw)
 	configCartRoutes(mux, cartHandler, authMw)
 
 	return mux, nil
@@ -50,10 +54,15 @@ func configAuthAndUserRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandl
 func configProductRoutes(mux *http.ServeMux, productHandler *handlers.ProductHandler, authMiddleware authMiddleware) {
 	mux.HandleFunc("GET /api/products/{id}", productHandler.GetProductHandler)
 	mux.HandleFunc("GET /api/products", productHandler.ListProductsHandler)
-	mux.HandleFunc("GET /api/products/category/{categoryId}", productHandler.GetProductsByCategoryIDHandler)
+	mux.HandleFunc("GET /api/products/categories/{categoryId}", productHandler.GetProductsByCategoryIDHandler)
 	mux.Handle("POST /api/products", authMiddleware(http.HandlerFunc(productHandler.CreateProductHandler)))
 	mux.Handle("PUT /api/products/{id}", authMiddleware(http.HandlerFunc(productHandler.UpdateProductHandler)))
 	mux.Handle("DELETE /api/products/{id}", authMiddleware(http.HandlerFunc(productHandler.DeleteProductHandler)))
+}
+
+func configProductCategoriesRoutes(mux *http.ServeMux, productCategoriesHandler *handlers.ProductCategoriesHandler, authMiddleware authMiddleware) {
+	mux.HandleFunc("GET /api/products/categories", productCategoriesHandler.GetProductCategoriesHandler)
+	mux.Handle("POST /api/products/categories", authMiddleware(http.HandlerFunc(productCategoriesHandler.CreateProductCategoryHandler)))
 }
 
 func configCartRoutes(mux *http.ServeMux, cartHandler *handlers.CartHandler, authMiddleware authMiddleware) {

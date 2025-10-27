@@ -19,8 +19,9 @@ service ProductService {
 
 message Product {
   string id = 1;
-  string name = 2;
-  string description = 3;
+  string category_id = 2;
+  string name = 3;
+  string description = 4;
   double price = 5;
   int32 stock_quantity = 6;
   google.protobuf.Timestamp created_at = 7;

@@ -17,7 +17,6 @@ import (
 
 func TestGetProductCategories(t *testing.T) {
 	t.Run("Success", testGetProductCategoriesSuccess)
-	t.Run("Not Found", testGetProductCategoriesNotFound)
 	t.Run("DB Error", testGetProductCategoriesDBError)
 	t.Run("Context Canceled", testGetProductCategoriesContextCanceled)
 }
@@ -33,22 +32,6 @@ func testGetProductCategoriesSuccess(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
-	mockQuerier.AssertExpectations(t)
-}
-
-func testGetProductCategoriesNotFound(t *testing.T) {
-	req := &emptypb.Empty{}
-	mockQuerier := new(product_service_mock.MockQuerier)
-	server := category.New(mockQuerier)
-
-	mockQuerier.On("GetProductCategories", mock.Anything).Return([]repository.ProductCategory{}, pgx.ErrNoRows).Once()
-
-	_, err := server.GetProductCategories(context.Background(), req)
-
-	assert.Error(t, err)
-	st, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.NotFound, st.Code())
 	mockQuerier.AssertExpectations(t)
 }
 

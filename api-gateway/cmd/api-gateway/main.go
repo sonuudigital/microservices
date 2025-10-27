@@ -8,6 +8,7 @@ import (
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/api-gateway/internal/router"
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
+	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/auth"
@@ -34,11 +35,20 @@ func main() {
 
 	userServiceClient := initializeUserServiceClient(logger)
 	productServiceClient := initializeProductServiceClient(logger)
+	productCategoriesServiceClient := initializeProductCategoriesServiceClient(logger)
 	cartServiceClient := initializeCartServiceClient(logger)
 
 	authHandler := handlers.NewAuthHandler(logger, jwtManager, userServiceClient)
 
-	mux, err := router.New(authHandler, jwtManager, logger, userServiceClient, productServiceClient, cartServiceClient)
+	mux, err := router.New(
+		authHandler,
+		jwtManager,
+		logger,
+		userServiceClient,
+		productServiceClient,
+		productCategoriesServiceClient,
+		cartServiceClient,
+	)
 	if err != nil {
 		logger.Error("failed to configure routes", "error", err)
 		os.Exit(1)
@@ -89,6 +99,24 @@ func initializeProductServiceClient(logger logs.Logger) productv1.ProductService
 	logger.Info("connected to product service", "address", productServiceURL)
 
 	return productv1.NewProductServiceClient(conn)
+}
+
+func initializeProductCategoriesServiceClient(logger logs.Logger) product_categoriesv1.ProductCategoriesServiceClient {
+	productServiceURL := os.Getenv("PRODUCT_SERVICE_GRPC_URL")
+	if productServiceURL == "" {
+		logger.Error("PRODUCT_SERVICE_GRPC_URL not found in environment variables")
+		os.Exit(1)
+	}
+
+	conn, err := grpc.NewClient(productServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Error("failed to connect to product service", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("connected to product categories service", "address", productServiceURL)
+
+	return product_categoriesv1.NewProductCategoriesServiceClient(conn)
 }
 
 func initializeCartServiceClient(logger logs.Logger) cartv1.CartServiceClient {

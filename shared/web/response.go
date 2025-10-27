@@ -17,7 +17,8 @@ const (
 	failedToEncodeMsg       = "failed to encode response"
 	failedToEncodeErrRspMsg = "failed to encode error response"
 
-	ReqCancelledMsg = "request cancelled"
+	httpStatusClientClosedRequest = 499
+	ReqCancelledMsg               = "request cancelled"
 )
 
 type ProblemDetail struct {
@@ -91,13 +92,25 @@ func RespondWithError(w http.ResponseWriter, logger logs.Logger, r *http.Request
 func RespondWithGRPCError(w http.ResponseWriter, r *http.Request, grpcStatus *status.Status, logger logs.Logger) {
 	httpStatus := HTTPStatusFromGRPC(grpcStatus.Code())
 
-	problem := GRPCProblemDetail{
-		Type:     getErrorDocumentationLink(httpStatus),
-		Title:    grpcStatus.Message(),
-		Status:   httpStatus,
-		Detail:   grpcStatus.Message(),
-		Instance: r.URL.Path,
-		Details:  grpcStatus.Details(),
+	var problem = GRPCProblemDetail{}
+	if httpStatus != http.StatusInternalServerError {
+		problem = GRPCProblemDetail{
+			Type:     getErrorDocumentationLink(httpStatus),
+			Title:    grpcStatus.Message(),
+			Status:   httpStatus,
+			Detail:   grpcStatus.Message(),
+			Instance: r.URL.Path,
+			Details:  grpcStatus.Details(),
+		}
+	} else {
+		problem = GRPCProblemDetail{
+			Type:     getErrorDocumentationLink(httpStatus),
+			Title:    "Internal Server Error",
+			Status:   httpStatus,
+			Detail:   "an internal server error occurred",
+			Instance: r.URL.Path,
+			Details:  grpcStatus.Details(),
+		}
 	}
 
 	w.Header().Set(contentType, "application/problem+json")
@@ -111,10 +124,19 @@ func RespondWithGRPCError(w http.ResponseWriter, r *http.Request, grpcStatus *st
 	}
 }
 
-func CheckContext(ctx context.Context, logger logs.Logger) bool {
+func CheckContext(ctx context.Context, w http.ResponseWriter, r *http.Request, logger logs.Logger) bool {
 	if ctx.Err() != nil {
-		if logger != nil {
-			logger.Error(ReqCancelledMsg, "error", ctx.Err())
+		ctxErr := ctx.Err()
+		switch ctxErr {
+		case context.Canceled:
+			logger.Warn("request canceled by the client", "error", ctxErr)
+			RespondWithError(w, logger, r, httpStatusClientClosedRequest, "Request Canceled", "the request was canceled by the client")
+		case context.DeadlineExceeded:
+			logger.Warn("request deadline exceeded", "error", ctxErr)
+			RespondWithError(w, logger, r, http.StatusGatewayTimeout, "Deadline Exceeded", "the request deadline was exceeded")
+		default:
+			logger.Error("context error", "error", ctxErr)
+			RespondWithError(w, logger, r, http.StatusInternalServerError, "Internal Server Error", "an internal server error occurred")
 		}
 		return false
 	}
@@ -126,7 +148,7 @@ func HTTPStatusFromGRPC(code codes.Code) int {
 	case codes.OK:
 		return http.StatusOK
 	case codes.Canceled:
-		return http.StatusRequestTimeout
+		return httpStatusClientClosedRequest
 	case codes.Unknown:
 		return http.StatusInternalServerError
 	case codes.InvalidArgument:
