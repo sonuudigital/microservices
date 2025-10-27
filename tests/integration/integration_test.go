@@ -44,7 +44,6 @@ type Product struct {
 	Name          string  `json:"name"`
 	Description   string  `json:"description"`
 	Price         float64 `json:"price"`
-	Code          string  `json:"code"`
 	StockQuantity int32   `json:"stock_quantity"`
 }
 
@@ -171,15 +170,46 @@ func TestProductCRUD(t *testing.T) {
 	_, authToken := registerAndLogin(require)
 	require.NotEmpty(authToken)
 
+	var createdProductCategories ProductCategory
 	var createdProduct Product
 
+	t.Run("Create Product Category", func(t *testing.T) {
+		productCategoryReq := ProductCategoryRequest{
+			Name:        fmt.Sprintf("TEST CATEGORY%d", time.Now().Unix()),
+			Description: fmt.Sprintf("TEST DESCRIPTION%d", time.Now().Unix()),
+		}
+
+		body, err := json.Marshal(productCategoryReq)
+		require.NoError(err)
+
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s", apiGatewayURL, productCategoriesEndpoint), bytes.NewBuffer(body))
+		require.NoError(err)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		require.NoError(err)
+		defer resp.Body.Close()
+
+		assert.Equal(http.StatusCreated, resp.StatusCode)
+
+		err = json.NewDecoder(resp.Body).Decode(&createdProductCategories)
+		require.NoError(err)
+		assert.Equal(productCategoryReq.Name, createdProductCategories.Name)
+		assert.Equal(productCategoryReq.Description, createdProductCategories.Description)
+		assert.NotEmpty(createdProductCategories.ID, "Product Category ID should not be empty")
+		assert.NotEmpty(createdProductCategories.CreatedAt, "Product Category CreatedAt should not be empty")
+		fmt.Println("Created Product Category ID:", createdProductCategories.ID)
+	})
+
 	t.Run("Create Product", func(t *testing.T) {
+		require.NotEmpty(createdProductCategories.ID, "Product Category must be created first")
 		productReq := Product{
-			CategoryID:    "a1eebc99-9c0b-4ef8-bb6d-6bb9bd380b11",
+			CategoryID:    createdProductCategories.ID,
 			Name:          "Laptop Gamer",
 			Description:   "The best laptop for gaming",
 			Price:         2500.50,
-			Code:          fmt.Sprintf("LP-%d", time.Now().UnixNano()),
 			StockQuantity: 10,
 		}
 
@@ -199,6 +229,7 @@ func TestProductCRUD(t *testing.T) {
 		assert.Equal(http.StatusCreated, resp.StatusCode)
 
 		err = json.NewDecoder(resp.Body).Decode(&createdProduct)
+		fmt.Println("Created Product", createdProduct)
 		require.NoError(err)
 		assert.NotEmpty(createdProduct.ID)
 		assert.Equal(productReq.Name, createdProduct.Name)
@@ -225,9 +256,9 @@ func TestProductCRUD(t *testing.T) {
 	})
 
 	t.Run("Get Products By Category", func(t *testing.T) {
-		require.NotEmpty(createdProduct.ID, createProductStepMsg)
+		require.NotEmpty(createdProduct.CategoryID, createProductStepMsg)
 
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/products/category/%s", apiGatewayURL, createdProduct.CategoryID), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/products/categories/%s", apiGatewayURL, createdProduct.CategoryID), nil)
 		require.NoError(err)
 		req.Header.Set("Authorization", bearerWithSpace+authToken)
 
@@ -247,7 +278,7 @@ func TestProductCRUD(t *testing.T) {
 	t.Run("Update Product", func(t *testing.T) {
 		require.NotEmpty(createdProduct.ID, createProductStepMsg)
 
-		updateReq := Product{Name: "Laptop Office", Price: 1200.75, StockQuantity: 25}
+		updateReq := Product{CategoryID: createdProduct.CategoryID, Name: "Laptop Office", Price: 1200.75, StockQuantity: 25}
 		body, err := json.Marshal(updateReq)
 		require.NoError(err)
 
@@ -330,25 +361,48 @@ type AddProductToCartResponse struct {
 	AddedAt   string  `json:"addedAt"`
 }
 
-func createProduct(require *require.Assertions, apiGatewayURL, authToken, name, code string, price float64, stockQuantity int32) Product {
-	productReq := Product{
-		Name:          name,
-		Description:   fmt.Sprintf("Description for %s", name),
-		Price:         price,
-		Code:          code,
-		StockQuantity: stockQuantity,
+func createProduct(require *require.Assertions, apiGatewayURL, authToken, name string, price float64, stockQuantity int32) Product {
+	categoryReq := ProductCategoryRequest{
+		Name:        fmt.Sprintf("Category for %s", name),
+		Description: fmt.Sprintf("Auto-generated category for %s", name),
 	}
 
-	body, err := json.Marshal(productReq)
+	body, err := json.Marshal(categoryReq)
 	require.NoError(err)
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/products", apiGatewayURL), bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s", apiGatewayURL, productCategoriesEndpoint), bytes.NewBuffer(body))
 	require.NoError(err)
 	req.Header.Set("Authorization", bearerWithSpace+authToken)
 	req.Header.Set(contentTypeHeader, contentTypeJSON)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	require.NoError(err)
+	defer resp.Body.Close()
+
+	require.Equal(http.StatusCreated, resp.StatusCode)
+
+	var category ProductCategory
+	err = json.NewDecoder(resp.Body).Decode(&category)
+	require.NoError(err)
+
+	productReq := Product{
+		CategoryID:    category.ID,
+		Name:          name,
+		Description:   fmt.Sprintf("Description for %s", name),
+		Price:         price,
+		StockQuantity: stockQuantity,
+	}
+
+	body, err = json.Marshal(productReq)
+	require.NoError(err)
+
+	req, err = http.NewRequest("POST", fmt.Sprintf("%s/api/products", apiGatewayURL), bytes.NewBuffer(body))
+	require.NoError(err)
+	req.Header.Set("Authorization", bearerWithSpace+authToken)
+	req.Header.Set(contentTypeHeader, contentTypeJSON)
+
+	resp, err = client.Do(req)
 	require.NoError(err)
 	defer resp.Body.Close()
 
@@ -370,9 +424,9 @@ func TestCartOperations(t *testing.T) {
 	_, authToken := registerAndLogin(require)
 	require.NotEmpty(authToken)
 
-	product1 := createProduct(require, apiGatewayURL, authToken, "Test Product 1", fmt.Sprintf("TP1-%d", time.Now().UnixNano()), 100.50, 20)
-	product2 := createProduct(require, apiGatewayURL, authToken, "Test Product 2", fmt.Sprintf("TP2-%d", time.Now().UnixNano()), 250.75, 15)
-	product3 := createProduct(require, apiGatewayURL, authToken, "Test Product 3", fmt.Sprintf("TP3-%d", time.Now().UnixNano()), 50.00, 30)
+	product1 := createProduct(require, apiGatewayURL, authToken, "Test Product 1", 100.50, 20)
+	product2 := createProduct(require, apiGatewayURL, authToken, "Test Product 2", 250.75, 15)
+	product3 := createProduct(require, apiGatewayURL, authToken, "Test Product 3", 50.00, 30)
 
 	t.Run("Get Empty Cart - Should Return 404", func(t *testing.T) {
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)

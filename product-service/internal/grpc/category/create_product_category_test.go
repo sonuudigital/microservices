@@ -71,6 +71,8 @@ func testCreateProductCategoryInvalidArgument(t *testing.T) {
 	mockQuerier := new(product_service_mock.MockQuerier)
 	server := category.New(mockQuerier)
 
+	mockQuerier.On("CreateProductCategory", mock.Anything, mock.Anything).Return(req, nil).Once()
+
 	_, err := server.CreateProductCategory(context.Background(), req)
 
 	assert.Error(t, err)

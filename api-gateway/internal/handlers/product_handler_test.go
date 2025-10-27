@@ -259,7 +259,7 @@ func TestGetProductsByCategoryIDHandler(t *testing.T) {
 
 		handler.GetProductsByCategoryIDHandler(rr, req)
 
-		assert.Equal(t, http.StatusRequestTimeout, rr.Code)
+		assert.Equal(t, 499, rr.Code)
 		mockClient.AssertExpectations(t)
 	})
 

@@ -166,6 +166,7 @@ func (h *ProductHandler) GetProductsByCategoryIDHandler(w http.ResponseWriter, r
 			h.logger.Error("context error", "error", ctxErr)
 			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, "Internal Server Error", "an internal server error occurred")
 		}
+		return
 	}
 
 	categoryID := r.PathValue("categoryId")

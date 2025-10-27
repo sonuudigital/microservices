@@ -33,6 +33,9 @@ func toGrpcProductCategory(pc repository.ProductCategory) *product_categoriesv1.
 }
 
 func toGrpcProductCategories(categories []repository.ProductCategory) []*product_categoriesv1.ProductCategory {
+	if len(categories) == 0 {
+		return []*product_categoriesv1.ProductCategory{}
+	}
 	grpcCategories := make([]*product_categoriesv1.ProductCategory, len(categories))
 	for i, pc := range categories {
 		grpcCategories[i] = toGrpcProductCategory(pc)
