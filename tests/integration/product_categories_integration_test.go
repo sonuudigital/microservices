@@ -22,6 +22,11 @@ type ProductCategoryRequest struct {
 	Description string `json:"description,omitempty"`
 }
 
+type UpdateCategoryRequest struct {
+	ID string `json:"id"`
+	ProductCategoryRequest
+}
+
 type ProductCategory struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -94,5 +99,31 @@ func TestProductCategoriesCRUD(t *testing.T) {
 			}
 		}
 		assert.True(found, "Created product category not found in the list")
+	})
+
+	t.Run("Update Product Category", func(t *testing.T) {
+		updateNameCategory := UpdateCategoryRequest{
+			ID: createdProductCategories.ID,
+			ProductCategoryRequest: ProductCategoryRequest{
+				Name:        "UPDATED CATEGORY NAME",
+				Description: createdProductCategories.Description,
+			},
+		}
+
+		body, err := json.Marshal(updateNameCategory)
+		require.NoError(err)
+
+		req, err := http.NewRequest("PUT", fmt.Sprintf("%s/%s", apiGatewayURL, productCategoriesEndpoint), bytes.NewBuffer(body))
+		require.NoError(err)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		require.NoError(err)
+		defer resp.Body.Close()
+
+		assert.Equal(http.StatusNoContent, resp.StatusCode)
+		assert.Empty(resp.ContentLength)
 	})
 }

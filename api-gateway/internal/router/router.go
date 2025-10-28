@@ -63,6 +63,7 @@ func configProductRoutes(mux *http.ServeMux, productHandler *handlers.ProductHan
 func configProductCategoriesRoutes(mux *http.ServeMux, productCategoriesHandler *handlers.ProductCategoriesHandler, authMiddleware authMiddleware) {
 	mux.HandleFunc("GET /api/products/categories", productCategoriesHandler.GetProductCategoriesHandler)
 	mux.Handle("POST /api/products/categories", authMiddleware(http.HandlerFunc(productCategoriesHandler.CreateProductCategoryHandler)))
+	mux.Handle("PUT /api/products/categories", authMiddleware(http.HandlerFunc(productCategoriesHandler.UpdateProductCategoryHandler)))
 }
 
 func configCartRoutes(mux *http.ServeMux, cartHandler *handlers.CartHandler, authMiddleware authMiddleware) {
