@@ -1,6 +1,6 @@
 module github.com/sonuudigital/microservices/cart-service
 
-go 1.25.0
+go 1.25.3
 
 require (
 	github.com/jackc/pgx/v5 v5.7.6
