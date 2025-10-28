@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
-	github.com/sonuudigital/microservices/gen v0.0.0-20251022201705-f3843615e342
+	github.com/sonuudigital/microservices/gen v0.0.0-20251028125517-904827fe6f94
 	github.com/sonuudigital/microservices/shared v0.0.0-20251022201705-f3843615e342
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.76.0

@@ -73,8 +73,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
-github.com/sonuudigital/microservices/gen v0.0.0-20251022201705-f3843615e342 h1:Z8qPrrwLhToKj9r2sPODvwofDVJ7n+G1fW1rwxYXwBs=
-github.com/sonuudigital/microservices/gen v0.0.0-20251022201705-f3843615e342/go.mod h1:e0E04SejFhz2uFgiHk99H76vBa3DeycTFk5wUXXcaEM=
+github.com/sonuudigital/microservices/gen v0.0.0-20251028125517-904827fe6f94 h1:69+ayyVWiOUzMZY1iNbLF4wXkSYfqnE1hL8V5BNiee0=
+github.com/sonuudigital/microservices/gen v0.0.0-20251028125517-904827fe6f94/go.mod h1:e0E04SejFhz2uFgiHk99H76vBa3DeycTFk5wUXXcaEM=
 github.com/sonuudigital/microservices/shared v0.0.0-20251022201705-f3843615e342 h1:e6zv75rH58deGFDZRZ3GgtDgPf6m3R2F17Y1iJMtkik=
 github.com/sonuudigital/microservices/shared v0.0.0-20251022201705-f3843615e342/go.mod h1:9YsI2K+BNo+dbBBFmDfOB1TBnQm4gdz/2tNzIyJVY+Q=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
