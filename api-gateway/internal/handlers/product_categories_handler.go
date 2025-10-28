@@ -11,6 +11,12 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+const (
+	failedGRPCParseErrorStatusMsg      = "failed to parse gRPC error status"
+	StatusInternalServerErrorTitleMsg  = "Internal Server Error"
+	StatusInternalServerErrorDetailMsg = "an internal server error occurred"
+)
+
 type ProductCategoriesHandler struct {
 	logger                  logs.Logger
 	productCategoriesClient product_categoriesv1.ProductCategoriesServiceClient
@@ -18,7 +24,12 @@ type ProductCategoriesHandler struct {
 
 type CreateProductCategoryRequest struct {
 	Name        string `json:"name"`
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
+}
+
+type UpdateProductCategoryRequest struct {
+	ID string `json:"id"`
+	CreateProductCategoryRequest
 }
 
 func NewProductCategoriesHandler(logger logs.Logger, productCategoriesClient product_categoriesv1.ProductCategoriesServiceClient) *ProductCategoriesHandler {
@@ -38,8 +49,8 @@ func (h *ProductCategoriesHandler) GetProductCategoriesHandler(w http.ResponseWr
 	if err != nil {
 		st, ok := status.FromError(err)
 		if !ok {
-			h.logger.Error("failed to parse gRPC error status", "error", err)
-			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, "Internal Server Error", "an internal server error occurred")
+			h.logger.Error(failedGRPCParseErrorStatusMsg, "error", err)
+			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, StatusInternalServerErrorTitleMsg, StatusInternalServerErrorDetailMsg)
 			return
 		}
 		h.logger.Error("failed to get product categories via gRPC", "error", st.Message())
@@ -69,7 +80,8 @@ func (h *ProductCategoriesHandler) CreateProductCategoryHandler(w http.ResponseW
 	}
 
 	if req.Name == "" {
-		h.logger.Warn("name is required")
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Validation Error", "name is required")
+		return
 	}
 
 	grpcReq := &product_categoriesv1.CreateProductCategoryRequest{
@@ -81,8 +93,8 @@ func (h *ProductCategoriesHandler) CreateProductCategoryHandler(w http.ResponseW
 	if err != nil {
 		st, ok := status.FromError(err)
 		if !ok {
-			h.logger.Error("failed to parse gRPC error status", "error", err)
-			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, "Internal Server Error", "an internal server error occurred")
+			h.logger.Error(failedGRPCParseErrorStatusMsg, "error", err)
+			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, StatusInternalServerErrorTitleMsg, StatusInternalServerErrorDetailMsg)
 			return
 		}
 		h.logger.Error("failed to create product category via gRPC", "error", st.Message())
@@ -91,4 +103,44 @@ func (h *ProductCategoriesHandler) CreateProductCategoryHandler(w http.ResponseW
 	}
 
 	web.RespondWithJSON(w, h.logger, http.StatusCreated, resp)
+}
+
+func (h *ProductCategoriesHandler) UpdateProductCategoryHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if !web.CheckContext(ctx, w, r, h.logger) {
+		return
+	}
+
+	var req UpdateProductCategoryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("failed to decode request body", "error", err)
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Invalid Request Body", err.Error())
+		return
+	}
+
+	if req.ID == "" || req.Name == "" {
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Validation Error", "Category ID and name is required")
+		return
+	}
+
+	grpcReq := &product_categoriesv1.UpdateProductCategoryRequest{
+		Id:          req.ID,
+		Name:        req.Name,
+		Description: req.Description,
+	}
+
+	_, err := h.productCategoriesClient.UpdateProductCategory(ctx, grpcReq)
+	if err != nil {
+		st, ok := status.FromError(err)
+		if !ok {
+			h.logger.Error(failedGRPCParseErrorStatusMsg, "error", err)
+			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, StatusInternalServerErrorTitleMsg, StatusInternalServerErrorDetailMsg)
+			return
+		}
+		h.logger.Error("failed to update product category via gRPC", "error", st.Message())
+		web.RespondWithGRPCError(w, r, st, h.logger)
+		return
+	}
+
+	web.RespondWithJSON(w, h.logger, http.StatusNoContent, nil)
 }
