@@ -43,6 +43,7 @@ func TestProductCategoriesCRUD(t *testing.T) {
 	_, authToken := registerAndLogin(require)
 	require.NotEmpty(authToken)
 
+	httpClient := &http.Client{}
 	var createdProductCategories ProductCategory
 
 	t.Run("Create Product Category", func(t *testing.T) {
@@ -57,10 +58,9 @@ func TestProductCategoriesCRUD(t *testing.T) {
 		req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s", apiGatewayURL, productCategoriesEndpoint), bytes.NewBuffer(body))
 		require.NoError(err)
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+		req.Header.Set("Authorization", bearerWithSpace+authToken)
 
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		resp, err := httpClient.Do(req)
 		require.NoError(err)
 		defer resp.Body.Close()
 
@@ -78,8 +78,7 @@ func TestProductCategoriesCRUD(t *testing.T) {
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s", apiGatewayURL, productCategoriesEndpoint), nil)
 		require.NoError(err)
 
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		resp, err := httpClient.Do(req)
 		require.NoError(err)
 		defer resp.Body.Close()
 
@@ -116,10 +115,22 @@ func TestProductCategoriesCRUD(t *testing.T) {
 		req, err := http.NewRequest("PUT", fmt.Sprintf("%s/%s", apiGatewayURL, productCategoriesEndpoint), bytes.NewBuffer(body))
 		require.NoError(err)
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+		req.Header.Set("Authorization", bearerWithSpace+authToken)
 
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		resp, err := httpClient.Do(req)
+		require.NoError(err)
+		defer resp.Body.Close()
+
+		assert.Equal(http.StatusNoContent, resp.StatusCode)
+		assert.Empty(resp.ContentLength)
+	})
+
+	t.Run("Delete Product Category", func(t *testing.T) {
+		req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/%s/%s", apiGatewayURL, productCategoriesEndpoint, createdProductCategories.ID), nil)
+		require.NoError(err)
+		req.Header.Set("Authorization", bearerWithSpace+authToken)
+
+		resp, err := httpClient.Do(req)
 		require.NoError(err)
 		defer resp.Body.Close()
 

@@ -15,6 +15,7 @@ const (
 	failedGRPCParseErrorStatusMsg      = "failed to parse gRPC error status"
 	StatusInternalServerErrorTitleMsg  = "Internal Server Error"
 	StatusInternalServerErrorDetailMsg = "an internal server error occurred"
+	validationErrorTitleMsg            = "Validation Error"
 )
 
 type ProductCategoriesHandler struct {
@@ -80,7 +81,7 @@ func (h *ProductCategoriesHandler) CreateProductCategoryHandler(w http.ResponseW
 	}
 
 	if req.Name == "" {
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Validation Error", "name is required")
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, validationErrorTitleMsg, "name is required")
 		return
 	}
 
@@ -119,7 +120,7 @@ func (h *ProductCategoriesHandler) UpdateProductCategoryHandler(w http.ResponseW
 	}
 
 	if req.ID == "" || req.Name == "" {
-		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, "Validation Error", "Category ID and name is required")
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, validationErrorTitleMsg, "Category ID and name is required")
 		return
 	}
 
@@ -138,6 +139,38 @@ func (h *ProductCategoriesHandler) UpdateProductCategoryHandler(w http.ResponseW
 			return
 		}
 		h.logger.Error("failed to update product category via gRPC", "error", st.Message())
+		web.RespondWithGRPCError(w, r, st, h.logger)
+		return
+	}
+
+	web.RespondWithJSON(w, h.logger, http.StatusNoContent, nil)
+}
+
+func (h *ProductCategoriesHandler) DeleteProductCategoryHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if !web.CheckContext(ctx, w, r, h.logger) {
+		return
+	}
+
+	categoryID := r.PathValue("id")
+	if categoryID == "" {
+		web.RespondWithError(w, h.logger, r, http.StatusBadRequest, validationErrorTitleMsg, "category ID is required")
+		return
+	}
+
+	grpcReq := &product_categoriesv1.DeleteProductCategoryRequest{
+		Id: categoryID,
+	}
+
+	_, err := h.productCategoriesClient.DeleteProductCategory(ctx, grpcReq)
+	if err != nil {
+		st, ok := status.FromError(err)
+		if !ok {
+			h.logger.Error(failedGRPCParseErrorStatusMsg, "error", err)
+			web.RespondWithError(w, h.logger, r, http.StatusInternalServerError, StatusInternalServerErrorTitleMsg, StatusInternalServerErrorDetailMsg)
+			return
+		}
+		h.logger.Error("failed to delete product category via gRPC", "error", st.Message())
 		web.RespondWithGRPCError(w, r, st, h.logger)
 		return
 	}
