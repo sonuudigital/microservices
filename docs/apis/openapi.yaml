@@ -1,0 +1,617 @@
+openapi: 3.0.3
+info:
+  title: Microservices E-Commerce API
+  description: |-
+    This is the public-facing API for the E-Commerce platform, provided by the API Gateway.
+    It exposes functionalities from various backend microservices like User, Product, and Cart services.
+  version: 1.0.0
+servers:
+  - url: /api
+    description: API Gateway
+tags:
+  - name: Authentication
+    description: User authentication operations.
+  - name: Users
+    description: User management.
+  - name: Products
+    description: Product management.
+  - name: Product Categories
+    description: Management of product categories.
+  - name: Cart
+    description: Shopping cart operations.
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User Login
+      description: Authenticates a user and returns a JWT token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /users:
+    post:
+      tags:
+        - Users
+      summary: Register a new user
+      description: Creates a new user account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to create user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Retrieves user information for the given ID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
+        '500':
+          description: Internal Server Error
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List products
+      description: Retrieves a paginated list of products.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: A list of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '500':
+          description: Internal Server Error
+    post:
+      tags:
+        - Products
+      summary: Create a new product
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Invalid request body
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+  /products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Get product by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A single product
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Products
+      summary: Update a product
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Invalid request body
+        '401':
+          description: Unauthorized
+        '404':
+          description: Product not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - Products
+      summary: Delete a product
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Product deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Product not found
+        '500':
+          description: Internal Server Error
+  /products/categories:
+    get:
+      tags:
+        - Product Categories
+      summary: List all product categories
+      responses:
+        '200':
+          description: A list of product categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductCategory'
+        '500':
+          description: Internal Server Error
+    post:
+      tags:
+        - Product Categories
+      summary: Create a product category
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductCategoryRequest'
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCategory'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Product Categories
+      summary: Update a product category
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductCategoryRequest'
+      responses:
+        '204':
+          description: Category updated
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Category not found
+        '500':
+          description: Internal Server Error
+  /products/categories/{id}:
+    delete:
+      tags:
+        - Product Categories
+      summary: Delete a product category
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Category deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Category not found
+        '500':
+          description: Internal Server Error
+  /products/categories/{categoryId}:
+    get:
+      tags:
+        - Products
+      summary: Get products by category ID
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '404':
+          description: Category not found
+        '500':
+          description: Internal Server Error
+  /carts:
+    get:
+      tags:
+        - Cart
+      summary: Get user's cart
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Cart details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Cart not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - Cart
+      summary: Delete the entire cart
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Cart deleted successfully
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+  /carts/products:
+    post:
+      tags:
+        - Cart
+      summary: Add a product to the cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddProductToCartRequest'
+      responses:
+        '200':
+          description: Product added to cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - Cart
+      summary: Clear all products from the cart
+      description: Removes all items from the user's cart, but does not delete the cart itself.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: All products removed from cart
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+  /carts/products/{productId}:
+    delete:
+      tags:
+        - Cart
+      summary: Remove a product from the cart
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Product removed from cart
+        '401':
+          description: Unauthorized
+        '404':
+          description: Product not found in cart
+        '500':
+          description: Internal Server Error
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+        categoryId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+        code:
+          type: string
+        stockQuantity:
+          type: integer
+    ProductRequest:
+      type: object
+      required:
+        - name
+        - categoryId
+        - price
+        - stockQuantity
+      properties:
+        categoryId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+        code:
+          type: string
+        stockQuantity:
+          type: integer
+    ProductCategory:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+    CreateProductCategoryRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    UpdateProductCategoryRequest:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+    Cart:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        total:
+          type: number
+          format: double
+    CartItem:
+      type: object
+      properties:
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          type: integer
+    AddProductToCartRequest:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+    Error:
+      type: object
+      properties:
+        type:
+          type: string
+          description: A URI reference that identifies the problem type.
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type.
+        status:
+          type: integer
+          description: The HTTP status code.
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence of the problem.
+        instance:
+          type: string
+          description: A URI reference that identifies the specific occurrence of the problem.
