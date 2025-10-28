@@ -64,6 +64,7 @@ func configProductCategoriesRoutes(mux *http.ServeMux, productCategoriesHandler 
 	mux.HandleFunc("GET /api/products/categories", productCategoriesHandler.GetProductCategoriesHandler)
 	mux.Handle("POST /api/products/categories", authMiddleware(http.HandlerFunc(productCategoriesHandler.CreateProductCategoryHandler)))
 	mux.Handle("PUT /api/products/categories", authMiddleware(http.HandlerFunc(productCategoriesHandler.UpdateProductCategoryHandler)))
+	mux.Handle("DELETE /api/products/categories/{id}", authMiddleware(http.HandlerFunc(productCategoriesHandler.DeleteProductCategoryHandler)))
 }
 
 func configCartRoutes(mux *http.ServeMux, cartHandler *handlers.CartHandler, authMiddleware authMiddleware) {
