@@ -144,19 +144,49 @@ func initializeRateLimiterMiddleware(logger logs.Logger) *middlewares.RateLimite
 		rateLimiterEnabled = false
 	}
 
-	rps, err := strconv.ParseFloat(os.Getenv("RATE_LIMITER_RPS"), 64)
+	unknownRPS, err := strconv.ParseFloat(os.Getenv("RATE_LIMITER_UNKNOWN_RPS"), 64)
 	if err != nil {
-		logger.Info("rate limiter rps not found, using default 10")
-		rps = 10
+		logger.Info("rate limiter unknown rps not found, using default 5")
+		unknownRPS = 5
 	}
 
-	burst, err := strconv.Atoi(os.Getenv("RATE_LIMITER_BURST"))
+	unknownBurst, err := strconv.Atoi(os.Getenv("RATE_LIMITER_UNKNOWN_BURST"))
 	if err != nil {
-		logger.Info("rate limiter burst not found, using default 20")
-		burst = 20
+		logger.Info("rate limiter unknown burst not found, using default 10")
+		unknownBurst = 10
 	}
 
-	logger.Info("rate limiter configured", "enabled", rateLimiterEnabled, "rps", rps, "burst", burst)
+	authRPS, err := strconv.ParseFloat(os.Getenv("RATE_LIMITER_AUTH_RPS"), 64)
+	if err != nil {
+		logger.Info("rate limiter authenticated rps not found, using default 20")
+		authRPS = 20
+	}
 
-	return middlewares.NewRateLimiterMiddleware(logger, rate.Limit(rps), burst, rateLimiterEnabled)
+	authBurst, err := strconv.Atoi(os.Getenv("RATE_LIMITER_AUTH_BURST"))
+	if err != nil {
+		logger.Info("rate limiter authenticated burst not found, using default 40")
+		authBurst = 40
+	}
+
+	rateLimits := map[int]middlewares.RateLimit{
+		middlewares.UnknownClient: {
+			Rate:  rate.Limit(unknownRPS),
+			Burst: unknownBurst,
+		},
+		middlewares.AuthenticatedClient: {
+			Rate:  rate.Limit(authRPS),
+			Burst: authBurst,
+		},
+	}
+
+	logger.Info(
+		"rate limiter configured",
+		"enabled", rateLimiterEnabled,
+		"unknown_rps", unknownRPS,
+		"unknown_burst", unknownBurst,
+		"auth_rps", authRPS,
+		"auth_burst", authBurst,
+	)
+
+	return middlewares.NewRateLimiterMiddleware(logger, rateLimits, rateLimiterEnabled)
 }
