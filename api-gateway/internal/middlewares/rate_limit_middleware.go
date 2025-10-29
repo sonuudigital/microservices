@@ -10,23 +10,30 @@ import (
 	"golang.org/x/time/rate"
 )
 
-type RateLimiterMiddleware struct {
-	logger    logs.Logger
-	limiter   *rate.Limiter
-	clients   map[string]*rate.Limiter
-	rate      rate.Limit
-	burst     int
-	isEnabled bool
-	mu        sync.Mutex
+const (
+	UnknownClient = iota
+	AuthenticatedClient
+)
+
+type RateLimit struct {
+	Rate  rate.Limit
+	Burst int
 }
 
-func NewRateLimiterMiddleware(logger logs.Logger, r rate.Limit, b int, isEnabled bool) *RateLimiterMiddleware {
+type RateLimiterMiddleware struct {
+	logger     logs.Logger
+	clients    map[string]*rate.Limiter
+	rateLimits map[int]RateLimit
+	isEnabled  bool
+	mu         sync.Mutex
+}
+
+func NewRateLimiterMiddleware(logger logs.Logger, rateLimits map[int]RateLimit, isEnabled bool) *RateLimiterMiddleware {
 	return &RateLimiterMiddleware{
-		logger:    logger,
-		clients:   make(map[string]*rate.Limiter),
-		rate:      r,
-		burst:     b,
-		isEnabled: isEnabled,
+		logger:     logger,
+		clients:    make(map[string]*rate.Limiter),
+		rateLimits: rateLimits,
+		isEnabled:  isEnabled,
 	}
 }
 
@@ -37,25 +44,17 @@ func (rl *RateLimiterMiddleware) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		var identifier string
-		claims, ok := GetUserClaims(r)
-		if ok {
-			identifier = claims.Subject
-		} else {
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				rl.logger.Error("could not parse IP from remote address", "error", err)
-				web.RespondWithError(w, rl.logger, r, http.StatusInternalServerError, "Internal Server Error", "Could not process request.")
-				return
-			}
-			identifier = ip
+		identifier, clientHaveClaims, err := rl.getUserClaimsOrIPAddress(r)
+		if err != nil {
+			rl.logger.Error("could not parse IP from remote address", "error", err)
+			web.RespondWithError(w, rl.logger, r, http.StatusInternalServerError, "Internal Server Error", "Could not process request.")
+			return
 		}
 
 		rl.mu.Lock()
 		limiter, exists := rl.clients[identifier]
 		if !exists {
-			limiter = rate.NewLimiter(rl.rate, rl.burst)
-			rl.clients[identifier] = limiter
+			limiter = rl.createLimiterForClient(identifier, clientHaveClaims)
 		}
 		rl.mu.Unlock()
 
@@ -66,4 +65,39 @@ func (rl *RateLimiterMiddleware) Middleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (rl *RateLimiterMiddleware) createLimiterForClient(identifier string, isAuthenticated bool) *rate.Limiter {
+	var rlConfig RateLimit
+	if isAuthenticated {
+		rlConfig = rl.rateLimits[AuthenticatedClient]
+	} else {
+		rlConfig = rl.rateLimits[UnknownClient]
+	}
+
+	limiter := rate.NewLimiter(rlConfig.Rate, rlConfig.Burst)
+	rl.clients[identifier] = limiter
+	return limiter
+}
+
+func (rl *RateLimiterMiddleware) getUserClaimsOrIPAddress(r *http.Request) (string, bool, error) {
+	claims, ok := GetUserClaims(r)
+	if ok {
+		return claims.Subject, ok, nil
+	}
+
+	ip, err := rl.extractIPAddress(r)
+	if err != nil {
+		return "", false, err
+	}
+
+	return ip, false, nil
+}
+
+func (rl *RateLimiterMiddleware) extractIPAddress(r *http.Request) (string, error) {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return "", err
+	}
+	return ip, nil
 }
