@@ -3,30 +3,16 @@ package router
 import (
 	"net/http"
 
+	"github.com/sonuudigital/microservices/api-gateway/internal/clients"
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
 	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
-	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
-	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
-	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
-	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
 )
 
-type Router struct {
-	Logger                  logs.Logger
-	RateLimiter             *middlewares.RateLimiterMiddleware
-	AuthHandler             *handlers.AuthHandler
-	JwtManager              *auth.JWTManager
-	UserClient              userv1.UserServiceClient
-	ProductClient           productv1.ProductServiceClient
-	ProductCategoriesClient product_categoriesv1.ProductCategoriesServiceClient
-	CartClient              cartv1.CartServiceClient
-}
-
 type authMiddleware func(http.Handler) http.Handler
 
-func New(r Router) (http.Handler, error) {
+func New(logger logs.Logger, jwtManager *auth.JWTManager, rateLimiter *middlewares.RateLimiterMiddleware, clients *clients.GRPCClient) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -34,19 +20,20 @@ func New(r Router) (http.Handler, error) {
 		_, _ = w.Write([]byte("gateway is healthy"))
 	})
 
-	authMw := middlewares.AuthMiddleware(r.JwtManager, r.Logger)
-	userHandler := handlers.NewUserHandler(r.Logger, r.UserClient)
-	productHandler := handlers.NewProductHandler(r.Logger, r.ProductClient)
-	productCategoriesHandler := handlers.NewProductCategoriesHandler(r.Logger, r.ProductCategoriesClient)
-	cartHandler := handlers.NewCartHandler(r.Logger, r.CartClient)
+	authMw := middlewares.AuthMiddleware(jwtManager, logger)
+	authHandler := handlers.NewAuthHandler(logger, jwtManager, clients.UserServiceClient)
+	userHandler := handlers.NewUserHandler(logger, clients.UserServiceClient)
+	productHandler := handlers.NewProductHandler(logger, clients.ProductServiceClient)
+	productCategoriesHandler := handlers.NewProductCategoriesHandler(logger, clients.ProductCategoriesServiceClient)
+	cartHandler := handlers.NewCartHandler(logger, clients.CartServiceClient)
 
-	configAuthAndUserRoutes(mux, r.AuthHandler, userHandler, authMw)
+	configAuthAndUserRoutes(mux, authHandler, userHandler, authMw)
 	configProductRoutes(mux, productHandler, authMw)
 	configProductCategoriesRoutes(mux, productCategoriesHandler, authMw)
 	configCartRoutes(mux, cartHandler, authMw)
 
 	var handler http.Handler = mux
-	handler = r.RateLimiter.Middleware(handler)
+	handler = rateLimiter.Middleware(handler)
 
 	return handler, nil
 }

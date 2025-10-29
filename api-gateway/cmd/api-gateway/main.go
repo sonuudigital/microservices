@@ -5,19 +5,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
+	"github.com/sonuudigital/microservices/api-gateway/internal/clients"
 	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
 	"github.com/sonuudigital/microservices/api-gateway/internal/router"
-	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
-	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
-	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
-	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/web"
 	"golang.org/x/time/rate"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/joho/godotenv"
 )
@@ -34,23 +28,23 @@ func main() {
 	logger.Info("starting api-gateway")
 
 	jwtManager := initializeJWTManager(logger)
-	userServiceClient := initializeUserServiceClient(logger)
-	productServiceClient := initializeProductServiceClient(logger)
-	productCategoriesServiceClient := initializeProductCategoriesServiceClient(logger)
-	cartServiceClient := initializeCartServiceClient(logger)
-	authHandler := handlers.NewAuthHandler(logger, jwtManager, userServiceClient)
 	rateLimiterMiddleware := initializeRateLimiterMiddleware(logger)
 
-	handler, err := router.New(router.Router{
-		Logger:                  logger,
-		RateLimiter:             rateLimiterMiddleware,
-		AuthHandler:             authHandler,
-		JwtManager:              jwtManager,
-		UserClient:              userServiceClient,
-		ProductClient:           productServiceClient,
-		ProductCategoriesClient: productCategoriesServiceClient,
-		CartClient:              cartServiceClient,
+	if !verifyEnvironmentServiceURLs(logger) {
+		os.Exit(1)
+	}
+
+	clients, err := clients.NewGRPCClient(clients.ClientURL{
+		UserServiceURL:    os.Getenv("USER_SERVICE_GRPC_URL"),
+		ProductServiceURL: os.Getenv("PRODUCT_SERVICE_GRPC_URL"),
+		CartServiceURL:    os.Getenv("CART_SERVICE_GRPC_URL"),
 	})
+	if err != nil {
+		logger.Error("failed to create gRPC clients", "error", err.Error())
+		os.Exit(1)
+	}
+
+	handler, err := router.New(logger, jwtManager, rateLimiterMiddleware, clients)
 	if err != nil {
 		logger.Error("failed to configure routes", "error", err)
 		os.Exit(1)
@@ -67,76 +61,21 @@ func main() {
 	web.StartServerAndWaitForShutdown(srv, logger)
 }
 
-func initializeUserServiceClient(logger logs.Logger) userv1.UserServiceClient {
-	userServiceURL := os.Getenv("USER_SERVICE_GRPC_URL")
-	if userServiceURL == "" {
-		logger.Error("USER_SERVICE_GRPC_URL not found in environment variables")
-		os.Exit(1)
+func verifyEnvironmentServiceURLs(logger logs.Logger) bool {
+	requiredEnvVars := []string{
+		"USER_SERVICE_GRPC_URL",
+		"PRODUCT_SERVICE_GRPC_URL",
+		"CART_SERVICE_GRPC_URL",
 	}
 
-	conn, err := grpc.NewClient(userServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		logger.Error("failed to connect to user service", "error", err)
-		os.Exit(1)
+	for _, envVar := range requiredEnvVars {
+		if os.Getenv(envVar) == "" {
+			logger.Error(envVar + " not found in environment variables")
+			return false
+		}
 	}
 
-	logger.Info("connected to user service", "address", userServiceURL)
-
-	return userv1.NewUserServiceClient(conn)
-}
-
-func initializeProductServiceClient(logger logs.Logger) productv1.ProductServiceClient {
-	productServiceURL := os.Getenv("PRODUCT_SERVICE_GRPC_URL")
-	if productServiceURL == "" {
-		logger.Error("PRODUCT_SERVICE_GRPC_URL not found in environment variables")
-		os.Exit(1)
-	}
-
-	conn, err := grpc.NewClient(productServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		logger.Error("failed to connect to product service", "error", err)
-		os.Exit(1)
-	}
-
-	logger.Info("connected to product service", "address", productServiceURL)
-
-	return productv1.NewProductServiceClient(conn)
-}
-
-func initializeProductCategoriesServiceClient(logger logs.Logger) product_categoriesv1.ProductCategoriesServiceClient {
-	productServiceURL := os.Getenv("PRODUCT_SERVICE_GRPC_URL")
-	if productServiceURL == "" {
-		logger.Error("PRODUCT_SERVICE_GRPC_URL not found in environment variables")
-		os.Exit(1)
-	}
-
-	conn, err := grpc.NewClient(productServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		logger.Error("failed to connect to product service", "error", err)
-		os.Exit(1)
-	}
-
-	logger.Info("connected to product categories service", "address", productServiceURL)
-
-	return product_categoriesv1.NewProductCategoriesServiceClient(conn)
-}
-
-func initializeCartServiceClient(logger logs.Logger) cartv1.CartServiceClient {
-	cartServiceURL := os.Getenv("CART_SERVICE_GRPC_URL")
-	if cartServiceURL == "" {
-		logger.Error("CART_SERVICE_GRPC_URL not found in environment variables")
-		os.Exit(1)
-	}
-
-	conn, err := grpc.NewClient(cartServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		logger.Error("failed to connect to cart service", "error", err)
-		os.Exit(1)
-	}
-
-	logger.Info("connected to cart service", "address", cartServiceURL)
-
-	return cartv1.NewCartServiceClient(conn)
+	return true
 }
 
 func initializeJWTManager(logger logs.Logger) *auth.JWTManager {
