@@ -21,6 +21,9 @@ services:
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
       JWT_TTL_MINUTES: ${JWT_TTL_MINUTES}
+      RATE_LIMITER_ENABLED: ${RATE_LIMITER_ENABLED}
+      RATE_LIMITER_RPS: ${RATE_LIMITER_RPS}
+      RATE_LIMITER_BURST: ${RATE_LIMITER_BURST}
     depends_on:
       user-service:
         condition: service_started

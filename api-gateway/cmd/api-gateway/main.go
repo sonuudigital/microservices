@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
+	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
 	"github.com/sonuudigital/microservices/api-gateway/internal/router"
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
@@ -14,6 +15,7 @@ import (
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/web"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -32,30 +34,30 @@ func main() {
 	logger.Info("starting api-gateway")
 
 	jwtManager := initializeJWTManager(logger)
-
 	userServiceClient := initializeUserServiceClient(logger)
 	productServiceClient := initializeProductServiceClient(logger)
 	productCategoriesServiceClient := initializeProductCategoriesServiceClient(logger)
 	cartServiceClient := initializeCartServiceClient(logger)
-
 	authHandler := handlers.NewAuthHandler(logger, jwtManager, userServiceClient)
+	rateLimiterMiddleware := initializeRateLimiterMiddleware(logger)
 
-	mux, err := router.New(
-		authHandler,
-		jwtManager,
-		logger,
-		userServiceClient,
-		productServiceClient,
-		productCategoriesServiceClient,
-		cartServiceClient,
-	)
+	handler, err := router.New(router.Router{
+		Logger:                  logger,
+		RateLimiter:             rateLimiterMiddleware,
+		AuthHandler:             authHandler,
+		JwtManager:              jwtManager,
+		UserClient:              userServiceClient,
+		ProductClient:           productServiceClient,
+		ProductCategoriesClient: productCategoriesServiceClient,
+		CartClient:              cartServiceClient,
+	})
 	if err != nil {
 		logger.Error("failed to configure routes", "error", err)
 		os.Exit(1)
 	}
 	logger.Info("routes configured successfully")
 
-	srv, err := web.InitializeServer(os.Getenv("PORT"), mux, logger)
+	srv, err := web.InitializeServer(os.Getenv("PORT"), handler, logger)
 	if err != nil {
 		logger.Error("failed to initialize server", "error", err)
 		os.Exit(1)
@@ -194,4 +196,28 @@ func initializeJWTManager(logger logs.Logger) *auth.JWTManager {
 	}
 
 	return jwtManager
+}
+
+func initializeRateLimiterMiddleware(logger logs.Logger) *middlewares.RateLimiterMiddleware {
+	rateLimiterEnabled, err := strconv.ParseBool(os.Getenv("RATE_LIMITER_ENABLED"))
+	if err != nil {
+		logger.Info("rate limiter is disabled by default")
+		rateLimiterEnabled = false
+	}
+
+	rps, err := strconv.ParseFloat(os.Getenv("RATE_LIMITER_RPS"), 64)
+	if err != nil {
+		logger.Info("rate limiter rps not found, using default 10")
+		rps = 10
+	}
+
+	burst, err := strconv.Atoi(os.Getenv("RATE_LIMITER_BURST"))
+	if err != nil {
+		logger.Info("rate limiter burst not found, using default 20")
+		burst = 20
+	}
+
+	logger.Info("rate limiter configured", "enabled", rateLimiterEnabled, "rps", rps, "burst", burst)
+
+	return middlewares.NewRateLimiterMiddleware(logger, rate.Limit(rps), burst, rateLimiterEnabled)
 }

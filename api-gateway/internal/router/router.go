@@ -13,17 +13,20 @@ import (
 	"github.com/sonuudigital/microservices/shared/logs"
 )
 
+type Router struct {
+	Logger                  logs.Logger
+	RateLimiter             *middlewares.RateLimiterMiddleware
+	AuthHandler             *handlers.AuthHandler
+	JwtManager              *auth.JWTManager
+	UserClient              userv1.UserServiceClient
+	ProductClient           productv1.ProductServiceClient
+	ProductCategoriesClient product_categoriesv1.ProductCategoriesServiceClient
+	CartClient              cartv1.CartServiceClient
+}
+
 type authMiddleware func(http.Handler) http.Handler
 
-func New(
-	authHandler *handlers.AuthHandler,
-	jwtManager *auth.JWTManager,
-	logger logs.Logger,
-	userClient userv1.UserServiceClient,
-	productClient productv1.ProductServiceClient,
-	productCategoriesClient product_categoriesv1.ProductCategoriesServiceClient,
-	cartClient cartv1.CartServiceClient,
-) (*http.ServeMux, error) {
+func New(r Router) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -31,18 +34,21 @@ func New(
 		_, _ = w.Write([]byte("gateway is healthy"))
 	})
 
-	authMw := middlewares.AuthMiddleware(jwtManager, logger)
-	userHandler := handlers.NewUserHandler(logger, userClient)
-	productHandler := handlers.NewProductHandler(logger, productClient)
-	productCategoriesHandler := handlers.NewProductCategoriesHandler(logger, productCategoriesClient)
-	cartHandler := handlers.NewCartHandler(logger, cartClient)
+	authMw := middlewares.AuthMiddleware(r.JwtManager, r.Logger)
+	userHandler := handlers.NewUserHandler(r.Logger, r.UserClient)
+	productHandler := handlers.NewProductHandler(r.Logger, r.ProductClient)
+	productCategoriesHandler := handlers.NewProductCategoriesHandler(r.Logger, r.ProductCategoriesClient)
+	cartHandler := handlers.NewCartHandler(r.Logger, r.CartClient)
 
-	configAuthAndUserRoutes(mux, authHandler, userHandler, authMw)
+	configAuthAndUserRoutes(mux, r.AuthHandler, userHandler, authMw)
 	configProductRoutes(mux, productHandler, authMw)
 	configProductCategoriesRoutes(mux, productCategoriesHandler, authMw)
 	configCartRoutes(mux, cartHandler, authMw)
 
-	return mux, nil
+	var handler http.Handler = mux
+	handler = r.RateLimiter.Middleware(handler)
+
+	return handler, nil
 }
 
 func configAuthAndUserRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler, authMiddleware authMiddleware) {
