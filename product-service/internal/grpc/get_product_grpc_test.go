@@ -3,12 +3,14 @@ package grpc_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/go-redis/redismock/v9"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
+	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,12 +24,19 @@ func TestGetProduct(t *testing.T) {
 
 	req := &productv1.GetProductRequest{Id: uuidTest}
 
-	t.Run("Success", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
-		redisClient, _ := redismock.NewClientMock()
+	t.Run("Success - Cache Miss", func(t *testing.T) {
+		mockQuerier := new(product_service_mock.MockQuerier)
+		redisClient, redisMock := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
+
+		redisMock.ExpectHGetAll(productCachePrefix + uuidTest).SetVal(map[string]string{})
+
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).
 			Return(repository.Product{ID: pgUUID, Name: "Test Product"}, nil).Once()
+
+		redisMock.MatchExpectationsInOrder(false)
+		redisMock.ExpectHSet(mock.Anything, mock.Anything).SetVal(1)
+		redisMock.ExpectExpire(mock.Anything, 10*time.Minute).SetVal(true)
 
 		res, err := server.GetProduct(context.Background(), req)
 
@@ -37,10 +46,39 @@ func TestGetProduct(t *testing.T) {
 		mockQuerier.AssertExpectations(t)
 	})
 
-	t.Run("Not Found", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
-		redisClient, _ := redismock.NewClientMock()
+	t.Run("Success - Cache Hit", func(t *testing.T) {
+		mockQuerier := new(product_service_mock.MockQuerier)
+		redisClient, redisMock := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
+
+		cachedProduct := map[string]string{
+			"id":            uuidTest,
+			"categoryId":    "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22",
+			"name":          "Cached Product",
+			"description":   "From Cache",
+			"price":         "99.99",
+			"stockQuantity": "100",
+			"createdAt":     "1698624000",
+			"updatedAt":     "1698624000",
+		}
+		redisMock.ExpectHGetAll(productCachePrefix + uuidTest).SetVal(cachedProduct)
+
+		res, err := server.GetProduct(context.Background(), req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, "Cached Product", res.Name)
+		assert.Equal(t, "From Cache", res.Description)
+		mockQuerier.AssertNotCalled(t, "GetProduct", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Not Found", func(t *testing.T) {
+		mockQuerier := new(product_service_mock.MockQuerier)
+		redisClient, redisMock := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
+
+		redisMock.ExpectHGetAll(productCachePrefix + uuidTest).SetVal(map[string]string{})
+
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).Return(repository.Product{}, pgx.ErrNoRows).Once()
 
 		res, err := server.GetProduct(context.Background(), req)
@@ -54,7 +92,7 @@ func TestGetProduct(t *testing.T) {
 	})
 
 	t.Run("Context Canceled", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
+		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())

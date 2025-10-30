@@ -3,11 +3,13 @@ package grpc_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/go-redis/redismock/v9"
 	"github.com/jackc/pgx/v5/pgtype"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
+	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -26,11 +28,15 @@ func TestUpdateProduct(t *testing.T) {
 	}
 
 	t.Run("Success", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
-		redisClient, _ := redismock.NewClientMock()
+		mockQuerier := new(product_service_mock.MockQuerier)
+		redisClient, redisMock := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("UpdateProduct", mock.Anything, mock.AnythingOfType("repository.UpdateProductParams")).
 			Return(repository.Product{ID: pgtype.UUID{Bytes: [16]byte{}, Valid: true}, Name: req.Name}, nil).Once()
+
+		redisMock.MatchExpectationsInOrder(false)
+		redisMock.ExpectHSet(mock.Anything, mock.Anything).SetVal(1)
+		redisMock.ExpectExpire(mock.Anything, 10*time.Minute).SetVal(true)
 
 		res, err := server.UpdateProduct(context.Background(), req)
 
@@ -41,7 +47,7 @@ func TestUpdateProduct(t *testing.T) {
 	})
 
 	t.Run("Context Canceled", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
+		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())

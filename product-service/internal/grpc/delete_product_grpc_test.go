@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
+	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,11 +24,13 @@ func TestDeleteProduct(t *testing.T) {
 	req := &productv1.DeleteProductRequest{Id: uuidTest}
 
 	t.Run("Success", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
-		redisClient, _ := redismock.NewClientMock()
+		mockQuerier := new(product_service_mock.MockQuerier)
+		redisClient, redisMock := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).Return(repository.Product{}, nil).Once()
 		mockQuerier.On("DeleteProduct", mock.Anything, pgUUID).Return(nil).Once()
+
+		redisMock.ExpectDel("product:" + uuidTest).SetVal(1)
 
 		_, err := server.DeleteProduct(context.Background(), req)
 
@@ -36,11 +39,12 @@ func TestDeleteProduct(t *testing.T) {
 	})
 
 	t.Run("Not Found", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
-		redisClient, _ := redismock.NewClientMock()
+		mockQuerier := new(product_service_mock.MockQuerier)
+		redisClient, redisMock := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).Return(repository.Product{}, pgx.ErrNoRows).Once()
 
+		_ = redisMock
 		_, err := server.DeleteProduct(context.Background(), req)
 
 		assert.Error(t, err)
@@ -51,7 +55,7 @@ func TestDeleteProduct(t *testing.T) {
 	})
 
 	t.Run("Context Canceled", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
+		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())

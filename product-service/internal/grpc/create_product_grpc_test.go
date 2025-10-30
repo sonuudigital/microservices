@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-redis/redismock/v9"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
+	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -25,11 +27,15 @@ func TestCreateProduct(t *testing.T) {
 	}
 
 	t.Run("Success", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
-		redisClient, _ := redismock.NewClientMock()
+		mockQuerier := new(product_service_mock.MockQuerier)
+		redisClient, redisMock := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("CreateProduct", mock.Anything, mock.AnythingOfType("repository.CreateProductParams")).
 			Return(repository.Product{Name: req.Name}, nil).Once()
+
+		redisMock.MatchExpectationsInOrder(false)
+		redisMock.ExpectHSet(mock.Anything, mock.Anything).SetVal(1)
+		redisMock.ExpectExpire(mock.Anything, 10*time.Minute).SetVal(true)
 
 		res, err := server.CreateProduct(context.Background(), req)
 
@@ -40,7 +46,7 @@ func TestCreateProduct(t *testing.T) {
 	})
 
 	t.Run("DB Error", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
+		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("CreateProduct", mock.Anything, mock.AnythingOfType("repository.CreateProductParams")).
@@ -57,7 +63,7 @@ func TestCreateProduct(t *testing.T) {
 	})
 
 	t.Run("Context Canceled", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
+		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())
