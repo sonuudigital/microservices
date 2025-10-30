@@ -7,6 +7,7 @@ import (
 	"github.com/go-redis/redismock/v9"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
+	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -18,7 +19,7 @@ func TestListProducts(t *testing.T) {
 	req := &productv1.ListProductsRequest{Limit: 10, Offset: 0}
 
 	t.Run("Success", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
+		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("ListProductsPaginated", mock.Anything, mock.AnythingOfType("repository.ListProductsPaginatedParams")).
@@ -33,7 +34,7 @@ func TestListProducts(t *testing.T) {
 	})
 
 	t.Run("Context Canceled", func(t *testing.T) {
-		mockQuerier := new(MockQuerier)
+		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
 		server := grpc_server.NewServer(mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())

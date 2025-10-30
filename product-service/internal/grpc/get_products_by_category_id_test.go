@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc "github.com/sonuudigital/microservices/product-service/internal/grpc"
+	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -38,7 +39,7 @@ func testSuccess(t *testing.T) {
 
 func testsMalformedUUID(t *testing.T) {
 	req := &productv1.GetProductsByCategoryIDRequest{CategoryId: uuidMalformed}
-	mockQuerier := new(MockQuerier)
+	mockQuerier := new(product_service_mock.MockQuerier)
 	redisClient, _ := redismock.NewClientMock()
 	server := grpc.NewServer(mockQuerier, redisClient)
 
@@ -91,9 +92,9 @@ func testContextCanceled(t *testing.T) {
 	mockQuerier.AssertNotCalled(t, "GetProductsByCategoryID", mock.Anything, mock.Anything)
 }
 
-func initializeProductService() (*productv1.GetProductsByCategoryIDRequest, *MockQuerier, *grpc.GRPCServer) {
+func initializeProductService() (*productv1.GetProductsByCategoryIDRequest, *product_service_mock.MockQuerier, *grpc.GRPCServer) {
 	req := &productv1.GetProductsByCategoryIDRequest{CategoryId: uuidCategoryTest}
-	mockQuerier := new(MockQuerier)
+	mockQuerier := new(product_service_mock.MockQuerier)
 	redisClient, _ := redismock.NewClientMock()
 	server := grpc.NewServer(mockQuerier, redisClient)
 	return req, mockQuerier, server
