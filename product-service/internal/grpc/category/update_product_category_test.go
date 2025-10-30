@@ -31,7 +31,7 @@ func testUpdateProductCategorySuccess(t *testing.T) {
 		Name:        categoryName,
 		Description: categoryDescription,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, redisMock, server := initializeMocksAndServer()
 
 	var id pgtype.UUID
 	_ = id.Scan(categoryID)
@@ -40,6 +40,8 @@ func testUpdateProductCategorySuccess(t *testing.T) {
 		On("UpdateProductCategory", mock.Anything, mock.AnythingOfType(mockOfTypeUpdateProductCategoryParams)).
 		Return(nil).
 		Once()
+
+	redisMock.ExpectDel("product_categories:all").SetVal(1)
 
 	_, err := server.UpdateProductCategory(context.Background(), req)
 
@@ -53,7 +55,7 @@ func testUpdateProductCategoryInvalidArgument(t *testing.T) {
 		Name:        categoryName,
 		Description: categoryDescription,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	mockQuerier.
 		On("UpdateProductCategory", mock.Anything, mock.Anything).
@@ -75,7 +77,7 @@ func testUpdateProductCategoryNotFound(t *testing.T) {
 		Name:        categoryName,
 		Description: categoryDescription,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	var id pgtype.UUID
 	_ = id.Scan(categoryID)
@@ -100,7 +102,7 @@ func testUpdateProductCategoryInternalError(t *testing.T) {
 		Name:        categoryName,
 		Description: categoryDescription,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	var id pgtype.UUID
 	_ = id.Scan(categoryID)
@@ -125,7 +127,7 @@ func testUpdateProductCategoryContextCanceled(t *testing.T) {
 		Name:        categoryName,
 		Description: categoryDescription,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	var id pgtype.UUID
 	_ = id.Scan(categoryID)

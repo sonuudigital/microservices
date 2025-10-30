@@ -8,8 +8,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
-	"github.com/sonuudigital/microservices/product-service/internal/grpc/category"
-	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -31,8 +29,7 @@ func testCreateProductCategorySuccess(t *testing.T) {
 		Description: "Phones and gadgets",
 	}
 
-	mockQuerier := new(product_service_mock.MockQuerier)
-	server := category.New(mockQuerier)
+	mockQuerier, redisMock, server := initializeMocksAndServer()
 
 	var id pgtype.UUID
 	_ = id.Scan("b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22")
@@ -52,6 +49,8 @@ func testCreateProductCategorySuccess(t *testing.T) {
 		Return(repoPC, nil).
 		Once()
 
+	redisMock.ExpectDel("product_categories:all").SetVal(1)
+
 	resp, err := server.CreateProductCategory(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -68,8 +67,7 @@ func testCreateProductCategoryInvalidArgument(t *testing.T) {
 		Description: "desc",
 	}
 
-	mockQuerier := new(product_service_mock.MockQuerier)
-	server := category.New(mockQuerier)
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	mockQuerier.On("CreateProductCategory", mock.Anything, mock.Anything).Return(req, nil).Once()
 
@@ -88,8 +86,7 @@ func testCreateProductCategoryNotFound(t *testing.T) {
 		Description: "Fiction",
 	}
 
-	mockQuerier := new(product_service_mock.MockQuerier)
-	server := category.New(mockQuerier)
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	mockQuerier.
 		On("CreateProductCategory", mock.Anything, mock.Anything).
@@ -111,8 +108,7 @@ func testCreateProductCategoryDBError(t *testing.T) {
 		Description: "Kitchen",
 	}
 
-	mockQuerier := new(product_service_mock.MockQuerier)
-	server := category.New(mockQuerier)
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	mockQuerier.
 		On("CreateProductCategory", mock.Anything, mock.Anything).
@@ -134,8 +130,7 @@ func testCreateProductCategoryContextCanceled(t *testing.T) {
 		Description: "Plants",
 	}
 
-	mockQuerier := new(product_service_mock.MockQuerier)
-	server := category.New(mockQuerier)
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
