@@ -22,8 +22,10 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE}
       JWT_TTL_MINUTES: ${JWT_TTL_MINUTES}
       RATE_LIMITER_ENABLED: ${RATE_LIMITER_ENABLED}
-      RATE_LIMITER_RPS: ${RATE_LIMITER_RPS}
-      RATE_LIMITER_BURST: ${RATE_LIMITER_BURST}
+      RATE_LIMITER_UNKNOWN_RPS: ${RATE_LIMITER_UNKNOWN_RPS}
+      RATE_LIMITER_UNKNOWN_BURST: ${RATE_LIMITER_UNKNOWN_BURST}
+      RATE_LIMITER_AUTH_RPS: ${RATE_LIMITER_AUTH_RPS}
+      RATE_LIMITER_AUTH_BURST: ${RATE_LIMITER_AUTH_BURST}
     depends_on:
       user-service:
         condition: service_started
@@ -31,6 +33,8 @@ services:
         condition: service_started
       cart-service:
         condition: service_started
+      redis-cache:
+        condition: service_healthy
     networks:
       - services-network
 
@@ -65,7 +69,7 @@ services:
     environment:
       PRODUCT_SERVICE_GRPC_PORT: ${PRODUCT_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${PRODUCT_POSTGRES_USER}:${PRODUCT_POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_POSTGRES_DB}?sslmode=disable
-      REDIS_URL: "redis-cache:6379"
+      REDIS_URL: "redis://redis-cache:6379"
       MIGRATIONS_DIR: /migrations
       LOG_LEVEL: ${LOG_LEVEL}
     depends_on:

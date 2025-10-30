@@ -39,17 +39,17 @@ func main() {
 	logger.Info("database connected successfully")
 	defer pgDb.Close()
 
-	redisClient, err := initializeRedisClient(logger)
+	redisClient, err := initializeRedisClient()
 	if err != nil {
 		logger.Error("error connecting to redis", "error", err)
-		os.Exit(1) 
+		os.Exit(1)
 	}
 	logger.Info("redis connected successfully")
 
 	startGRPCServer(pgDb, redisClient, logger)
 }
 
-func initializeRedisClient(logger logs.Logger) (*redis.Client, error) {
+func initializeRedisClient() (*redis.Client, error) {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		return nil, fmt.Errorf("REDIS_URL is not set")
@@ -86,7 +86,7 @@ func startGRPCServer(pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.
 	queries := repository.New(pgDb)
 	grpcServer := grpc.NewServer()
 
-	categoryServer := category.New(queries)
+	categoryServer := category.New(logger, queries, redisClient)
 	productServer := grpc_server.NewServer(queries, redisClient)
 
 	product_categoriesv1.RegisterProductCategoriesServiceServer(grpcServer, categoryServer)

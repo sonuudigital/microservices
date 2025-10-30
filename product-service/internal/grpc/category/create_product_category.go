@@ -35,5 +35,7 @@ func (s *GRPCServer) CreateProductCategory(ctx context.Context, req *product_cat
 		}
 	}
 
+	go s.deleteProductCategoriesCache()
+
 	return toGrpcProductCategory(newCategory), nil
 }

@@ -48,5 +48,7 @@ func (s *GRPCServer) UpdateProductCategory(ctx context.Context, req *product_cat
 		}
 	}
 
+	go s.deleteProductCategoriesCache()
+
 	return &emptypb.Empty{}, nil
 }

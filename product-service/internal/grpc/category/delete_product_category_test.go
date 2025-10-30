@@ -27,7 +27,7 @@ func testDeleteProductCategorySuccess(t *testing.T) {
 	req := &product_categoriesv1.DeleteProductCategoryRequest{
 		Id: categoryID,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, redisMock, server := initializeMocksAndServer()
 
 	var id pgtype.UUID
 	_ = id.Scan(categoryID)
@@ -36,6 +36,8 @@ func testDeleteProductCategorySuccess(t *testing.T) {
 		On("DeleteProductCategory", mock.Anything, id).
 		Return(nil).
 		Once()
+
+	redisMock.ExpectDel("product_categories:all").SetVal(1)
 
 	_, err := server.DeleteProductCategory(context.Background(), req)
 
@@ -47,7 +49,7 @@ func testDeleteProductCategoryInvalidArgumentEmptyID(t *testing.T) {
 	req := &product_categoriesv1.DeleteProductCategoryRequest{
 		Id: "",
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	_, err := server.DeleteProductCategory(context.Background(), req)
 
@@ -62,7 +64,7 @@ func testDeleteProductCategoryInvalidArgumentMalformedID(t *testing.T) {
 	req := &product_categoriesv1.DeleteProductCategoryRequest{
 		Id: malformedID,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	_, err := server.DeleteProductCategory(context.Background(), req)
 
@@ -77,7 +79,7 @@ func testDeleteProductCategoryNotFound(t *testing.T) {
 	req := &product_categoriesv1.DeleteProductCategoryRequest{
 		Id: categoryID,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	var id pgtype.UUID
 	_ = id.Scan(categoryID)
@@ -100,7 +102,7 @@ func testDeleteProductCategoryTooManyRows(t *testing.T) {
 	req := &product_categoriesv1.DeleteProductCategoryRequest{
 		Id: categoryID,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	var id pgtype.UUID
 	_ = id.Scan(categoryID)
@@ -123,7 +125,7 @@ func testDeleteProductCategoryInternalError(t *testing.T) {
 	req := &product_categoriesv1.DeleteProductCategoryRequest{
 		Id: categoryID,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	var id pgtype.UUID
 	_ = id.Scan(categoryID)
@@ -146,7 +148,7 @@ func testDeleteProductCategoryContextCanceled(t *testing.T) {
 	req := &product_categoriesv1.DeleteProductCategoryRequest{
 		Id: categoryID,
 	}
-	mockQuerier, server := initializeQuerierAndServer()
+	mockQuerier, _, server := initializeMocksAndServer()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

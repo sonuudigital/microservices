@@ -1,20 +1,42 @@
 package category
 
 import (
+	"context"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const (
+	allProductCategoriesCacheKey = "product_categories:all"
+	cacheExpirationTime          = 1 * time.Hour
+	cacheContextTimeout          = 2 * time.Second
 )
 
 type GRPCServer struct {
 	product_categoriesv1.UnimplementedProductCategoriesServiceServer
-	queries repository.Querier
+	logger      logs.Logger
+	queries     repository.Querier
+	redisClient *redis.Client
 }
 
-func New(queries repository.Querier) *GRPCServer {
+func New(logger logs.Logger, queries repository.Querier, redisClient *redis.Client) *GRPCServer {
 	return &GRPCServer{
-		queries: queries,
+		logger:      logger,
+		queries:     queries,
+		redisClient: redisClient,
 	}
+}
+
+func (s *GRPCServer) deleteProductCategoriesCache() {
+	ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
+	defer cancel()
+
+	s.redisClient.Del(ctx, allProductCategoriesCacheKey)
 }
 
 func toGrpcProductCategory(pc repository.ProductCategory) *product_categoriesv1.ProductCategory {
