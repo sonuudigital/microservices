@@ -18,6 +18,8 @@ import (
 	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/web"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/joho/godotenv"
 )
@@ -91,6 +93,26 @@ func startGRPCServer(pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.
 
 	product_categoriesv1.RegisterProductCategoriesServiceServer(grpcServer, categoryServer)
 	productv1.RegisterProductServiceServer(grpcServer, productServer)
+
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+
+	go func() {
+		healthServer.SetServingStatus("product-service", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		dbErr := pgDb.Ping(ctx)
+		redisErr := redisClient.Ping(ctx).Err()
+
+		if dbErr == nil && redisErr == nil {
+			logger.Info("service is healthy and serving")
+			healthServer.SetServingStatus("product-service", grpc_health_v1.HealthCheckResponse_SERVING)
+		} else {
+			logger.Error("service is not healthy", "dbError", dbErr, "redisError", redisErr)
+		}
+	}()
 
 	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
 }
