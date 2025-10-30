@@ -3,7 +3,9 @@ module github.com/sonuudigital/microservices/api-gateway
 go 1.25.3
 
 require (
+	github.com/go-redis/redis_rate/v10 v10.0.1
 	github.com/joho/godotenv v1.5.1
+	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sonuudigital/microservices/gen v0.0.0-00010101000000-000000000000
 	github.com/sonuudigital/microservices/shared v0.0.0-20251022201705-f3843615e342
 	golang.org/x/time v0.14.0
@@ -12,6 +14,8 @@ require (
 )
 
 require (
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect

@@ -3,8 +3,9 @@ package middlewares
 import (
 	"net"
 	"net/http"
-	"sync"
+	"time"
 
+	"github.com/go-redis/redis_rate/v10"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/web"
 	"golang.org/x/time/rate"
@@ -15,24 +16,23 @@ const (
 	AuthenticatedClient
 )
 
-type RateLimit struct {
+type RateLimitConfig struct {
 	Rate  rate.Limit
 	Burst int
 }
 
 type RateLimiterMiddleware struct {
 	logger     logs.Logger
-	clients    map[string]*rate.Limiter
-	rateLimits map[int]RateLimit
+	rateLimits map[int]RateLimitConfig
+	limiter    *redis_rate.Limiter
 	isEnabled  bool
-	mu         sync.Mutex
 }
 
-func NewRateLimiterMiddleware(logger logs.Logger, rateLimits map[int]RateLimit, isEnabled bool) *RateLimiterMiddleware {
+func NewRateLimiterMiddleware(logger logs.Logger, rateLimits map[int]RateLimitConfig, limiter *redis_rate.Limiter, isEnabled bool) *RateLimiterMiddleware {
 	return &RateLimiterMiddleware{
 		logger:     logger,
-		clients:    make(map[string]*rate.Limiter),
 		rateLimits: rateLimits,
+		limiter:    limiter,
 		isEnabled:  isEnabled,
 	}
 }
@@ -51,14 +51,21 @@ func (rl *RateLimiterMiddleware) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		rl.mu.Lock()
-		limiter, exists := rl.clients[identifier]
-		if !exists {
-			limiter = rl.createLimiterForClient(identifier, clientHaveClaims)
+		rlConfig := rl.getRateLimitConfig(clientHaveClaims)
+		limit := redis_rate.Limit{
+			Rate:   int(rlConfig.Rate),
+			Period: time.Second,
+			Burst:  rlConfig.Burst,
 		}
-		rl.mu.Unlock()
 
-		if !limiter.Allow() {
+		res, err := rl.limiter.Allow(r.Context(), identifier, limit)
+		if err != nil {
+			rl.logger.Error("could not check rate limit", "error", err)
+			web.RespondWithError(w, rl.logger, r, http.StatusInternalServerError, "Internal Server Error", "Could not process request.")
+			return
+		}
+
+		if res.Allowed == 0 {
 			web.RespondWithError(w, rl.logger, r, http.StatusTooManyRequests, "Too Many Requests", "You have exceeded the request limit.")
 			return
 		}
@@ -67,17 +74,11 @@ func (rl *RateLimiterMiddleware) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func (rl *RateLimiterMiddleware) createLimiterForClient(identifier string, isAuthenticated bool) *rate.Limiter {
-	var rlConfig RateLimit
+func (rl *RateLimiterMiddleware) getRateLimitConfig(isAuthenticated bool) RateLimitConfig {
 	if isAuthenticated {
-		rlConfig = rl.rateLimits[AuthenticatedClient]
-	} else {
-		rlConfig = rl.rateLimits[UnknownClient]
+		return rl.rateLimits[AuthenticatedClient]
 	}
-
-	limiter := rate.NewLimiter(rlConfig.Rate, rlConfig.Burst)
-	rl.clients[identifier] = limiter
-	return limiter
+	return rl.rateLimits[UnknownClient]
 }
 
 func (rl *RateLimiterMiddleware) getUserClaimsOrIPAddress(r *http.Request) (string, bool, error) {
