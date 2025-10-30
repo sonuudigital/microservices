@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sonuudigital/microservices/cart-service/internal/clients"
 	grpc_server "github.com/sonuudigital/microservices/cart-service/internal/grpc"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
@@ -13,6 +15,8 @@ import (
 	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/web"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/joho/godotenv"
 )
@@ -34,6 +38,11 @@ func main() {
 	logger.Info("database connected successfully")
 	defer pgDb.Close()
 
+	startGRPCServer(pgDb, logger)
+
+}
+
+func startGRPCServer(pgDb *pgxpool.Pool, logger logs.Logger) {
 	productServiceGrpcURL := os.Getenv("PRODUCT_SERVICE_GRPC_URL")
 	if productServiceGrpcURL == "" {
 		logger.Error("PRODUCT_SERVICE_GRPC_URL is not set")
@@ -62,6 +71,19 @@ func main() {
 	grpcServer := grpc.NewServer()
 	cartServer := grpc_server.NewGRPCServer(queries, productClient, logger)
 	cartv1.RegisterCartServiceServer(grpcServer, cartServer)
+
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+
+	go func() {
+		healthServer.SetServingStatus("cart-service", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+		if err := pgDb.Ping(context.Background()); err == nil {
+			logger.Info("service is healthy and serving")
+			healthServer.SetServingStatus("cart-service", grpc_health_v1.HealthCheckResponse_SERVING)
+		} else {
+			logger.Error("service is not healthy", "error", err)
+		}
+	}()
 
 	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
 }

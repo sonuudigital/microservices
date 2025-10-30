@@ -29,11 +29,11 @@ services:
       REDIS_URL: "redis://redis-cache:6379"
     depends_on:
       user-service:
-        condition: service_started
+        condition: service_healthy
       product-service:
-        condition: service_started
+        condition: service_healthy
       cart-service:
-        condition: service_started
+        condition: service_healthy
       redis-cache:
         condition: service_healthy
     networks:
@@ -56,6 +56,12 @@ services:
     depends_on:
       user-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/grpc_health_probe", "-addr=:${USER_SERVICE_GRPC_PORT}", "-service=user-service"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
     networks:
       - services-network
       - user-db-network
@@ -79,6 +85,12 @@ services:
         condition: service_healthy
       redis-cache:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/grpc_health_probe", "-addr=:${PRODUCT_SERVICE_GRPC_PORT}", "-service=product-service"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
     networks:
       - services-network
       - product-db-network
@@ -102,7 +114,13 @@ services:
       cart-db:
         condition: service_healthy
       product-service:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/grpc_health_probe", "-addr=:${CART_SERVICE_GRPC_PORT}", "-service=cart-service"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
     networks:
       - services-network
       - cart-db-network

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -13,6 +14,8 @@ import (
 	grpc_server "github.com/sonuudigital/microservices/user-service/internal/grpc"
 	"github.com/sonuudigital/microservices/user-service/internal/repository"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/joho/godotenv"
 )
@@ -55,6 +58,19 @@ func startGRPCServer(pgDb *pgxpool.Pool, logger logs.Logger) {
 	grpcServer := grpc.NewServer()
 	userServer := grpc_server.NewGRPCServer(queries, logger)
 	userv1.RegisterUserServiceServer(grpcServer, userServer)
+
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+
+	go func() {
+		healthServer.SetServingStatus("user-service", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+		if err := pgDb.Ping(context.Background()); err == nil {
+			logger.Info("service is healthy and serving")
+			healthServer.SetServingStatus("user-service", grpc_health_v1.HealthCheckResponse_SERVING)
+		} else {
+			logger.Error("service is not healthy", "error", err)
+		}
+	}()
 
 	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
 }

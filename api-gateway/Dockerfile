@@ -29,12 +29,20 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     go build -trimpath -buildvcs=false -ldflags="-s -w" \
     -o /out/api-gateway ./cmd/api-gateway
 
-FROM gcr.io/distroless/static:nonroot
+FROM alpine:3.20
+
+RUN apk --no-cache add curl ca-certificates
 
 COPY --from=builder /out/api-gateway /api-gateway
 
 ENV PORT=8080
 
 EXPOSE 8080
+
+RUN addgroup -S nonroot && adduser -S nonroot -G nonroot
+USER nonroot
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/api/healthz || exit 1
 
 CMD ["/api-gateway"]
