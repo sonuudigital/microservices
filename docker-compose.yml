@@ -65,14 +65,18 @@ services:
     environment:
       PRODUCT_SERVICE_GRPC_PORT: ${PRODUCT_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${PRODUCT_POSTGRES_USER}:${PRODUCT_POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_POSTGRES_DB}?sslmode=disable
+      REDIS_URL: "redis-cache:6379"
       MIGRATIONS_DIR: /migrations
       LOG_LEVEL: ${LOG_LEVEL}
     depends_on:
       product-db:
         condition: service_healthy
+      redis-cache:
+        condition: service_healthy
     networks:
       - services-network
       - product-db-network
+      - redis-network
 
   cart-service:
     container_name: cart-service
@@ -157,6 +161,22 @@ services:
       timeout: 3s
       retries: 10
 
+  redis-cache:
+    image: redis:8.2.2-alpine3.22
+    container_name: redis-cache
+    hostname: redis-cache
+    expose:
+      - "6379"
+    networks:
+      - redis-network
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   pgadmin:
     image: dpage/pgadmin4:9.9.0
     hostname: pgadmin
@@ -182,16 +202,14 @@ services:
 
 networks:
   services-network:
-    driver: bridge
   user-db-network:
-    driver: bridge
   product-db-network:
-    driver: bridge
   cart-db-network:
-    driver: bridge
+  redis-network:
 
 volumes:
   user_db_data:
   product_db_data:
   cart_db_data:
+  redis_data:
   pgadmin_data:

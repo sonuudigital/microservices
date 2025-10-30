@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/go-redis/redismock/v9"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
@@ -25,7 +26,8 @@ func TestCreateProduct(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewServer(mockQuerier)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("CreateProduct", mock.Anything, mock.AnythingOfType("repository.CreateProductParams")).
 			Return(repository.Product{Name: req.Name}, nil).Once()
 
@@ -39,7 +41,8 @@ func TestCreateProduct(t *testing.T) {
 
 	t.Run("DB Error", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewServer(mockQuerier)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("CreateProduct", mock.Anything, mock.AnythingOfType("repository.CreateProductParams")).
 			Return(repository.Product{}, errors.New("db error")).Once()
 
@@ -55,7 +58,8 @@ func TestCreateProduct(t *testing.T) {
 
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewServer(mockQuerier)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

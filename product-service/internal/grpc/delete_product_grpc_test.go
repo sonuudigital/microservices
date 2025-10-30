@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-redis/redismock/v9"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
@@ -23,7 +24,8 @@ func TestDeleteProduct(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewServer(mockQuerier)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).Return(repository.Product{}, nil).Once()
 		mockQuerier.On("DeleteProduct", mock.Anything, pgUUID).Return(nil).Once()
 
@@ -35,7 +37,8 @@ func TestDeleteProduct(t *testing.T) {
 
 	t.Run("Not Found", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewServer(mockQuerier)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).Return(repository.Product{}, pgx.ErrNoRows).Once()
 
 		_, err := server.DeleteProduct(context.Background(), req)
@@ -49,7 +52,8 @@ func TestDeleteProduct(t *testing.T) {
 
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewServer(mockQuerier)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

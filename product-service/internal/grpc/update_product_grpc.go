@@ -46,5 +46,19 @@ func (s *GRPCServer) UpdateProduct(ctx context.Context, req *productv1.UpdatePro
 		return nil, status.Errorf(codes.Internal, "failed to update product: %v", err)
 	}
 
-	return toGRPCProduct(product), nil
+	grpcProduct := toGRPCProduct(product)
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
+		defer cancel()
+
+		cacheKey := productCachePrefix + req.Id
+		productMap := productToMap(grpcProduct)
+		pipe := s.redisClient.Pipeline()
+		pipe.HSet(ctx, cacheKey, productMap)
+		pipe.Expire(ctx, cacheKey, cacheExpirationTime)
+		pipe.Exec(ctx)
+	}()
+
+	return grpcProduct, nil
 }

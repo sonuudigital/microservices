@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-redis/redismock/v9"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
@@ -23,7 +24,8 @@ func TestGetProduct(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewServer(mockQuerier)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).
 			Return(repository.Product{ID: pgUUID, Name: "Test Product"}, nil).Once()
 
@@ -37,7 +39,8 @@ func TestGetProduct(t *testing.T) {
 
 	t.Run("Not Found", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewServer(mockQuerier)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
 		mockQuerier.On("GetProduct", mock.Anything, pgUUID).Return(repository.Product{}, pgx.ErrNoRows).Once()
 
 		res, err := server.GetProduct(context.Background(), req)
@@ -52,7 +55,8 @@ func TestGetProduct(t *testing.T) {
 
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewServer(mockQuerier)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewServer(mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

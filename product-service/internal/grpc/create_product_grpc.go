@@ -33,14 +33,25 @@ func (s *GRPCServer) CreateProduct(ctx context.Context, req *productv1.CreatePro
 		Price:         price,
 		StockQuantity: req.StockQuantity,
 	}
-	if err := params.Price.Scan(fmt.Sprintf("%f", req.Price)); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid price: %v", err)
-	}
 
 	product, err := s.queries.CreateProduct(ctx, params)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create product: %v", err)
 	}
 
-	return toGRPCProduct(product), nil
+	grpcProduct := toGRPCProduct(product)
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
+		defer cancel()
+
+		cacheKey := productCachePrefix + grpcProduct.Id
+		productMap := productToMap(grpcProduct)
+		pipe := s.redisClient.Pipeline()
+		pipe.HSet(ctx, cacheKey, productMap)
+		pipe.Expire(ctx, cacheKey, cacheExpirationTime)
+		pipe.Exec(ctx)
+	}()
+
+	return grpcProduct, nil
 }

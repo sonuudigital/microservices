@@ -33,5 +33,12 @@ func (s *GRPCServer) DeleteProduct(ctx context.Context, req *productv1.DeletePro
 		return nil, status.Errorf(codes.Internal, "failed to delete product: %v", err)
 	}
 
+	go func() {
+		cacheKey := productCachePrefix + req.Id
+		ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
+		defer cancel()
+		s.redisClient.Del(ctx, cacheKey)
+	}()
+
 	return &emptypb.Empty{}, nil
 }
