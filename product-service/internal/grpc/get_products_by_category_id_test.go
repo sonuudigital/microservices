@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-redis/redismock/v9"
 	"github.com/jackc/pgx/v5"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	grpc "github.com/sonuudigital/microservices/product-service/internal/grpc"
@@ -38,7 +39,8 @@ func testSuccess(t *testing.T) {
 func testsMalformedUUID(t *testing.T) {
 	req := &productv1.GetProductsByCategoryIDRequest{CategoryId: uuidMalformed}
 	mockQuerier := new(MockQuerier)
-	server := grpc.NewServer(mockQuerier)
+	redisClient, _ := redismock.NewClientMock()
+	server := grpc.NewServer(mockQuerier, redisClient)
 
 	_, err := server.GetProductsByCategoryID(context.Background(), req)
 
@@ -92,6 +94,7 @@ func testContextCanceled(t *testing.T) {
 func initializeProductService() (*productv1.GetProductsByCategoryIDRequest, *MockQuerier, *grpc.GRPCServer) {
 	req := &productv1.GetProductsByCategoryIDRequest{CategoryId: uuidCategoryTest}
 	mockQuerier := new(MockQuerier)
-	server := grpc.NewServer(mockQuerier)
+	redisClient, _ := redismock.NewClientMock()
+	server := grpc.NewServer(mockQuerier, redisClient)
 	return req, mockQuerier, server
 }

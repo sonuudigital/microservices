@@ -15,6 +15,15 @@ func (s *GRPCServer) GetProduct(ctx context.Context, req *productv1.GetProductRe
 		return nil, status.FromContextError(err).Err()
 	}
 
+	cacheKey := productCachePrefix + req.Id
+	cachedData, err := s.redisClient.HGetAll(ctx, cacheKey).Result()
+	if err == nil && len(cachedData) > 0 {
+		product, err := mapToProduct(cachedData)
+		if err == nil {
+			return product, nil
+		}
+	}
+
 	var uid pgtype.UUID
 	if err := uid.Scan(req.Id); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid product id format: %s", req.Id)
@@ -28,5 +37,18 @@ func (s *GRPCServer) GetProduct(ctx context.Context, req *productv1.GetProductRe
 		return nil, status.Errorf(codes.Internal, "failed to get product: %v", err)
 	}
 
-	return toGRPCProduct(product), nil
+	grpcProduct := toGRPCProduct(product)
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
+		defer cancel()
+
+		productMap := productToMap(grpcProduct)
+		pipe := s.redisClient.Pipeline()
+		pipe.HSet(ctx, cacheKey, productMap)
+		pipe.Expire(ctx, cacheKey, cacheExpirationTime)
+		pipe.Exec(ctx)
+	}()
+
+	return grpcProduct, nil
 }

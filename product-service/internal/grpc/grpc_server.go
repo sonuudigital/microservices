@@ -2,20 +2,30 @@ package grpc
 
 import (
 	"strconv"
+	"time"
 
+	"github.com/redis/go-redis/v9"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+const (
+	productCachePrefix  = "product:"
+	cacheExpirationTime = 10 * time.Minute
+	cacheContextTimeout = 2 * time.Second
+)
+
 type GRPCServer struct {
 	productv1.UnimplementedProductServiceServer
-	queries repository.Querier
+	queries     repository.Querier
+	redisClient *redis.Client
 }
 
-func NewServer(queries repository.Querier) *GRPCServer {
+func NewServer(queries repository.Querier, redisClient *redis.Client) *GRPCServer {
 	return &GRPCServer{
-		queries: queries,
+		queries:     queries,
+		redisClient: redisClient,
 	}
 }
 
