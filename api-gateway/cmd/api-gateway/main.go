@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/go-redis/redis_rate/v10"
+	"github.com/redis/go-redis/v9"
 	"github.com/sonuudigital/microservices/api-gateway/internal/clients"
 	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
 	"github.com/sonuudigital/microservices/api-gateway/internal/router"
@@ -66,6 +69,7 @@ func verifyEnvironmentServiceURLs(logger logs.Logger) bool {
 		"USER_SERVICE_GRPC_URL",
 		"PRODUCT_SERVICE_GRPC_URL",
 		"CART_SERVICE_GRPC_URL",
+		"REDIS_URL",
 	}
 
 	for _, envVar := range requiredEnvVars {
@@ -168,7 +172,29 @@ func initializeRateLimiterMiddleware(logger logs.Logger) *middlewares.RateLimite
 		authBurst = 40
 	}
 
-	rateLimits := map[int]middlewares.RateLimit{
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		logger.Error("REDIS_URL is not set")
+		os.Exit(1)
+	}
+
+	opts, err := redis.ParseURL(redisURL)
+	if err != nil {
+		logger.Error("could not parse redis URL", "error", err)
+		os.Exit(1)
+	}
+
+	client := redis.NewClient(opts)
+	if err := client.Ping(context.Background()).Err(); err != nil {
+		logger.Error("failed to connect to redis", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("connected to redis successfully")
+
+	rateLimiter := redis_rate.NewLimiter(client)
+
+	rateLimits := map[int]middlewares.RateLimitConfig{
 		middlewares.UnknownClient: {
 			Rate:  rate.Limit(unknownRPS),
 			Burst: unknownBurst,
@@ -188,5 +214,5 @@ func initializeRateLimiterMiddleware(logger logs.Logger) *middlewares.RateLimite
 		"auth_burst", authBurst,
 	)
 
-	return middlewares.NewRateLimiterMiddleware(logger, rateLimits, rateLimiterEnabled)
+	return middlewares.NewRateLimiterMiddleware(logger, rateLimits, rateLimiter, rateLimiterEnabled)
 }

@@ -26,6 +26,7 @@ services:
       RATE_LIMITER_UNKNOWN_BURST: ${RATE_LIMITER_UNKNOWN_BURST}
       RATE_LIMITER_AUTH_RPS: ${RATE_LIMITER_AUTH_RPS}
       RATE_LIMITER_AUTH_BURST: ${RATE_LIMITER_AUTH_BURST}
+      REDIS_URL: "redis://redis-cache:6379"
     depends_on:
       user-service:
         condition: service_started
@@ -37,6 +38,7 @@ services:
         condition: service_healthy
     networks:
       - services-network
+      - redis-network
 
   user-service:
     container_name: user-service
