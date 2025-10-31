@@ -97,14 +97,15 @@ func (q *Queries) GetCartByUserID(ctx context.Context, userID pgtype.UUID) (Cart
 }
 
 const getCartProductsByCartID = `-- name: GetCartProductsByCartID :many
-SELECT product_id, quantity
+SELECT product_id, quantity, price
 FROM carts_products
 WHERE cart_id = $1
 `
 
 type GetCartProductsByCartIDRow struct {
-	ProductID pgtype.UUID `json:"productId"`
-	Quantity  int32       `json:"quantity"`
+	ProductID pgtype.UUID    `json:"productId"`
+	Quantity  int32          `json:"quantity"`
+	Price     pgtype.Numeric `json:"price"`
 }
 
 func (q *Queries) GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUID) ([]GetCartProductsByCartIDRow, error) {
@@ -116,7 +117,7 @@ func (q *Queries) GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUI
 	var items []GetCartProductsByCartIDRow
 	for rows.Next() {
 		var i GetCartProductsByCartIDRow
-		if err := rows.Scan(&i.ProductID, &i.Quantity); err != nil {
+		if err := rows.Scan(&i.ProductID, &i.Quantity, &i.Price); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

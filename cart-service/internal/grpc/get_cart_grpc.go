@@ -52,14 +52,19 @@ func (s *GRPCServer) GetCart(ctx context.Context, req *cartv1.GetCartRequest) (*
 			continue
 		}
 
+		priceFloat, err := cp.Price.Float64Value()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to convert price to float64: %v", err)
+		}
+
 		grpcCartProducts = append(grpcCartProducts, &cartv1.CartProduct{
 			ProductId:   product.ID,
 			Name:        product.Name,
 			Description: product.Description,
-			Price:       product.Price,
+			Price:       priceFloat.Float64,
 			Quantity:    cp.Quantity,
 		})
-		totalPrice += product.Price * float64(cp.Quantity)
+		totalPrice += priceFloat.Float64 * float64(cp.Quantity)
 	}
 
 	return &cartv1.GetCartResponse{
