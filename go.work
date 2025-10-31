@@ -9,5 +9,6 @@ use (
 	./payment-service
 	./product-service
 	./shared
+	./tools/health-checker
 	./user-service
 )
