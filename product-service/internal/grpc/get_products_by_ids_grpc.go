@@ -93,15 +93,10 @@ func (s *GRPCServer) convertToUUIDs(ids []string) ([]pgtype.UUID, error) {
 func (s *GRPCServer) cacheProducts(products []*productv1.Product) {
 	for _, product := range products {
 		go func(p *productv1.Product) {
-			ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
-			defer cancel()
-
 			cacheKey := productCachePrefix + p.Id
-			productMap := productToMap(p)
-			pipe := s.redisClient.Pipeline()
-			pipe.HSet(ctx, cacheKey, productMap)
-			pipe.Expire(ctx, cacheKey, cacheExpirationTime)
-			pipe.Exec(ctx)
+			if err := s.cacheProduct(p.Id, p); err != nil {
+				s.logger.Error("failed to cache product", "key", cacheKey, "error", err)
+			}
 		}(product)
 	}
 }

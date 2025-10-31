@@ -33,10 +33,8 @@ func (s *GRPCServer) DeleteProduct(ctx context.Context, req *productv1.DeletePro
 		return nil, status.Errorf(codes.Internal, "failed to delete product: %v", err)
 	}
 
-	cacheKey := productCachePrefix + req.Id
-	ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
-	defer cancel()
-	if err := s.redisClient.Del(ctx, cacheKey).Err(); err != nil {
+	if err := s.deleteProductCache(req.Id); err != nil {
+		cacheKey := productCachePrefix + req.Id
 		s.logger.Error("failed to delete product cache after deletion", "key", cacheKey, "error", err)
 	}
 
