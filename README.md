@@ -61,13 +61,22 @@ The project includes both unit and integration tests.
 
 - `POST /api/users` - User registration
 - `POST /api/auth/login` - User login
-- `GET /api/products` - List products
+- `GET /api/users/{id}` - Get user (protected)
+- `GET /api/products` - List products (paginated)
+- `GET /api/products/{id}` - Get product
 - `POST /api/products` - Create product (protected)
-- `GET /api/products/categories` - List product categories
-- `POST /api/products/categories` - Create a category (protected)
+- `PUT /api/products/{id}` - Update product (protected)
+- `DELETE /api/products/{id}` - Delete product (protected)
+- `GET /api/products/categories` - List all product categories
+- `POST /api/products/categories` - Create a product category (protected)
+- `PUT /api/products/categories` - Update a product category (protected)
+- `DELETE /api/products/categories/{id}` - Delete a product category (protected)
+- `GET /api/products/categories/{categoryId}` - Get products by category ID
 - `GET /api/carts` - Get user's cart (protected)
 - `POST /api/carts/products` - Add product to cart (protected)
-- `DELETE /api/carts` - Clear all products from the cart (protected)
+- `DELETE /api/carts/products/{productId}` - Remove product from cart (protected)
+- `DELETE /api/carts/products` - Clear all products from the cart (protected)
+- `DELETE /api/carts` - Deletes the entire cart (protected)
 
 ## License
 
