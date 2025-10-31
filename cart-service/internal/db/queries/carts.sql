@@ -12,7 +12,7 @@ DELETE FROM carts
 WHERE user_id = $1;
 
 -- name: GetCartProductsByCartID :many
-SELECT product_id, quantity
+SELECT product_id, quantity, price
 FROM carts_products
 WHERE cart_id = $1;
 
