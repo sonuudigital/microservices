@@ -21,6 +21,14 @@ func (s *GRPCServer) RemoveProductFromCart(ctx context.Context, req *cartv1.Remo
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user id format: %s", req.UserId)
 	}
 
+	_, wasRecreated, err := s.getOrCreateCartByUserID(ctx, userUUID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to validate cart: %v", err)
+	}
+	if wasRecreated {
+		return &emptypb.Empty{}, nil
+	}
+
 	var productUUID pgtype.UUID
 	if err := productUUID.Scan(req.ProductId); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid product id format: %s", req.ProductId)
