@@ -7,6 +7,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -18,12 +19,14 @@ const (
 
 type GRPCServer struct {
 	productv1.UnimplementedProductServiceServer
+	logger      logs.Logger
 	queries     repository.Querier
 	redisClient *redis.Client
 }
 
-func NewServer(queries repository.Querier, redisClient *redis.Client) *GRPCServer {
+func NewServer(logger logs.Logger, queries repository.Querier, redisClient *redis.Client) *GRPCServer {
 	return &GRPCServer{
+		logger:      logger,
 		queries:     queries,
 		redisClient: redisClient,
 	}

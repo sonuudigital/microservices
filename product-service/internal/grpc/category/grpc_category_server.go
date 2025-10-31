@@ -32,11 +32,11 @@ func New(logger logs.Logger, queries repository.Querier, redisClient *redis.Clie
 	}
 }
 
-func (s *GRPCServer) deleteProductCategoriesCache() {
+func (s *GRPCServer) deleteProductCategoriesCache() error {
 	ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
 	defer cancel()
 
-	s.redisClient.Del(ctx, allProductCategoriesCacheKey)
+	return s.redisClient.Del(ctx, allProductCategoriesCacheKey).Err()
 }
 
 func toGrpcProductCategory(pc repository.ProductCategory) *product_categoriesv1.ProductCategory {

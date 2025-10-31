@@ -9,6 +9,7 @@ import (
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
@@ -21,7 +22,7 @@ func TestListProducts(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 		mockQuerier.On("ListProductsPaginated", mock.Anything, mock.AnythingOfType("repository.ListProductsPaginatedParams")).
 			Return([]repository.Product{{Name: "Product 1"}, {Name: "Product 2"}}, nil).Once()
 
@@ -36,7 +37,7 @@ func TestListProducts(t *testing.T) {
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

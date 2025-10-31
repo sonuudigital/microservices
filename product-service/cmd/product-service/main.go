@@ -89,7 +89,7 @@ func startGRPCServer(pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.
 	grpcServer := grpc.NewServer()
 
 	categoryServer := category.New(logger, queries, redisClient)
-	productServer := grpc_server.NewServer(queries, redisClient)
+	productServer := grpc_server.NewServer(logger, queries, redisClient)
 
 	product_categoriesv1.RegisterProductCategoriesServiceServer(grpcServer, categoryServer)
 	productv1.RegisterProductServiceServer(grpcServer, productServer)
