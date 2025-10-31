@@ -3,7 +3,9 @@ package grpc_test
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	grpc_server "github.com/sonuudigital/microservices/cart-service/internal/grpc"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
@@ -13,20 +15,70 @@ import (
 )
 
 func TestGetCart(t *testing.T) {
-	mockQuerier := new(MockQuerier)
-	mockProductFetcher := new(MockProductFetcher)
-	server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, nil)
+	t.Setenv("CART_TTL_HOURS", "24")
 
-	req := &cartv1.GetCartRequest{UserId: uuidTest}
+	t.Run("Get existing cart successfully", func(t *testing.T) {
+		mockQuerier := new(MockQuerier)
+		mockProductFetcher := new(MockProductFetcher)
+		server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, nil)
 
-	var userUUID pgtype.UUID
-	_ = userUUID.Scan(uuidTest)
+		req := &cartv1.GetCartRequest{UserId: uuidTest}
 
-	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{ID: pgtype.UUID{}}, nil)
-	mockQuerier.On("GetCartProductsByCartID", mock.Anything, mock.Anything).Return([]repository.GetCartProductsByCartIDRow{}, nil)
-	mockProductFetcher.On("GetProductsByIDs", mock.Anything, mock.Anything).Return(map[string]grpc_server.Product{}, nil)
+		var userUUID pgtype.UUID
+		_ = userUUID.Scan(uuidTest)
+		var cartUUID pgtype.UUID
+		_ = cartUUID.Scan("b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12")
 
-	_, err := server.GetCart(context.Background(), req)
+		existingCart := repository.Cart{
+			ID:        cartUUID,
+			UserID:    userUUID,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		}
 
-	assert.NoError(t, err)
+		mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(existingCart, nil)
+		mockQuerier.On("GetCartProductsByCartID", mock.Anything, cartUUID).Return([]repository.GetCartProductsByCartIDRow{}, nil)
+		mockProductFetcher.On("GetProductsByIDs", mock.Anything, mock.Anything).Return(map[string]grpc_server.Product{}, nil)
+
+		resp, err := server.GetCart(context.Background(), req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Equal(t, cartUUID.String(), resp.Id)
+		assert.Equal(t, userUUID.String(), resp.UserId)
+		assert.Empty(t, resp.Products)
+		assert.Equal(t, 0.0, resp.TotalPrice)
+	})
+
+	t.Run("Create cart when it does not exist", func(t *testing.T) {
+		mockQuerier := new(MockQuerier)
+		mockProductFetcher := new(MockProductFetcher)
+		server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, nil)
+
+		req := &cartv1.GetCartRequest{UserId: uuidTest}
+
+		var userUUID pgtype.UUID
+		_ = userUUID.Scan(uuidTest)
+		var cartUUID pgtype.UUID
+		_ = cartUUID.Scan("b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12")
+
+		newCart := repository.Cart{
+			ID:        cartUUID,
+			UserID:    userUUID,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		}
+
+		mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{}, pgx.ErrNoRows)
+		mockQuerier.On("CreateCart", mock.Anything, userUUID).Return(newCart, nil)
+		mockQuerier.On("GetCartProductsByCartID", mock.Anything, cartUUID).Return([]repository.GetCartProductsByCartIDRow{}, nil)
+		mockProductFetcher.On("GetProductsByIDs", mock.Anything, mock.Anything).Return(map[string]grpc_server.Product{}, nil)
+
+		resp, err := server.GetCart(context.Background(), req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Equal(t, cartUUID.String(), resp.Id)
+		assert.Equal(t, userUUID.String(), resp.UserId)
+		assert.Empty(t, resp.Products)
+		assert.Equal(t, 0.0, resp.TotalPrice)
+	})
 }

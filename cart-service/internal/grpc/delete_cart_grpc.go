@@ -20,6 +20,14 @@ func (s *GRPCServer) DeleteCart(ctx context.Context, req *cartv1.DeleteCartReque
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user id format: %s", req.UserId)
 	}
 
+	_, wasRecreated, err := s.getOrCreateCartByUserID(ctx, uid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to validate cart: %v", err)
+	}
+	if wasRecreated {
+		return &emptypb.Empty{}, nil
+	}
+
 	if err := s.queries.DeleteCartByUserID(ctx, uid); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete cart: %v", err)
 	}

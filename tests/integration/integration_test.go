@@ -428,7 +428,7 @@ func TestCartOperations(t *testing.T) {
 	product2 := createProduct(require, apiGatewayURL, authToken, "Test Product 2", 250.75, 15)
 	product3 := createProduct(require, apiGatewayURL, authToken, "Test Product 3", 50.00, 30)
 
-	t.Run("Get Empty Cart - Should Return 404", func(t *testing.T) {
+	t.Run("Get Empty Cart - Should Return Empty Cart with 200", func(t *testing.T) {
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
 		require.NoError(err)
 		req.Header.Set("Authorization", bearerWithSpace+authToken)
@@ -438,7 +438,15 @@ func TestCartOperations(t *testing.T) {
 		require.NoError(err)
 		defer resp.Body.Close()
 
-		assert.Equal(http.StatusNotFound, resp.StatusCode)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+
+		var cart Cart
+		err = json.NewDecoder(resp.Body).Decode(&cart)
+		require.NoError(err)
+		assert.NotEmpty(cart.ID, "Cart ID should be created")
+		assert.NotEmpty(cart.UserID, "User ID should be present")
+		assert.Empty(cart.Products, "Products should be empty")
+		assert.Equal(0.0, cart.TotalPrice, "Total price should be 0")
 	})
 
 	t.Run("Add First Product to Cart", func(t *testing.T) {
@@ -741,7 +749,7 @@ func TestCartOperations(t *testing.T) {
 		assert.Equal(http.StatusNoContent, resp.StatusCode)
 	})
 
-	t.Run("Verify Cart Does Not Exist After Deletion", func(t *testing.T) {
+	t.Run("Verify New Empty Cart is Created After Deletion", func(t *testing.T) {
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
 		require.NoError(err)
 		req.Header.Set("Authorization", bearerWithSpace+authToken)
@@ -751,7 +759,15 @@ func TestCartOperations(t *testing.T) {
 		require.NoError(err)
 		defer resp.Body.Close()
 
-		assert.Equal(http.StatusNotFound, resp.StatusCode)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+
+		var cart Cart
+		err = json.NewDecoder(resp.Body).Decode(&cart)
+		require.NoError(err)
+		assert.NotEmpty(cart.ID, "A new cart should be created")
+		assert.NotEmpty(cart.UserID, "User ID should be present")
+		assert.Empty(cart.Products, "Products should be empty in new cart")
+		assert.Equal(0.0, cart.TotalPrice, "Total price should be 0 in new cart")
 	})
 
 	t.Run("Try to Add Product with Invalid Product ID", func(t *testing.T) {

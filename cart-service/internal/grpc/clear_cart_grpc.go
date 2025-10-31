@@ -20,6 +20,14 @@ func (s *GRPCServer) ClearCart(ctx context.Context, req *cartv1.ClearCartRequest
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user id format: %s", req.UserId)
 	}
 
+	_, wasRecreated, err := s.getOrCreateCartByUserID(ctx, userUUID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to validate cart: %v", err)
+	}
+	if wasRecreated {
+		return &emptypb.Empty{}, nil
+	}
+
 	if err := s.queries.ClearCartProductsByUserID(ctx, userUUID); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to clear cart: %v", err)
 	}

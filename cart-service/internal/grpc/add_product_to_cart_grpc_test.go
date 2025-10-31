@@ -3,8 +3,8 @@ package grpc_test
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	grpc_server "github.com/sonuudigital/microservices/cart-service/internal/grpc"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
@@ -14,6 +14,8 @@ import (
 )
 
 func TestAddProductToCart(t *testing.T) {
+	t.Setenv("CART_TTL_HOURS", "24")
+
 	mockQuerier := new(MockQuerier)
 	mockProductFetcher := new(MockProductFetcher)
 	server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, nil)
@@ -26,13 +28,27 @@ func TestAddProductToCart(t *testing.T) {
 
 	var userUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
+	var cartUUID pgtype.UUID
+	_ = cartUUID.Scan("b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12")
+	var productUUID pgtype.UUID
+	_ = productUUID.Scan(productIDTest)
 
-	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(repository.Cart{}, pgx.ErrNoRows)
-	mockQuerier.On("CreateCart", mock.Anything, userUUID).Return(repository.Cart{ID: pgtype.UUID{}}, nil)
+	existingCart := repository.Cart{
+		ID:        cartUUID,
+		UserID:    userUUID,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	mockQuerier.On("GetCartByUserID", mock.Anything, userUUID).Return(existingCart, nil)
 	mockProductFetcher.On("GetProductsByIDs", mock.Anything, []string{productIDTest}).Return(map[string]grpc_server.Product{
-		productIDTest: {ID: productIDTest, Price: 99.99},
+		productIDTest: {ID: productIDTest, Name: "Test Product", Description: "Test Description", Price: 99.99},
 	}, nil)
-	mockQuerier.On("AddOrUpdateProductInCart", mock.Anything, mock.Anything).Return(repository.CartsProduct{ID: pgtype.UUID{}}, nil)
+	mockQuerier.On("AddOrUpdateProductInCart", mock.Anything, mock.Anything).Return(repository.CartsProduct{
+		ID:        pgtype.UUID{},
+		CartID:    cartUUID,
+		ProductID: productUUID,
+		Quantity:  1,
+	}, nil)
 
 	_, err := server.AddProductToCart(context.Background(), req)
 

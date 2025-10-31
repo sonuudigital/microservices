@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
+	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -22,9 +21,13 @@ func (s *GRPCServer) AddProductToCart(ctx context.Context, req *cartv1.AddProduc
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user id format: %s", req.UserId)
 	}
 
-	cart, err := s.getOrCreateCartByUserID(ctx, userUUID)
+	cart, wasRecreated, err := s.getOrCreateCartByUserID(ctx, userUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get or create cart: %v", err)
+	}
+
+	if wasRecreated {
+		return nil, status.Errorf(codes.Aborted, "cart has expired and was cleared, please try again")
 	}
 
 	productsMap, err := s.productFetcher.GetProductsByIDs(ctx, []string{req.ProductId})
@@ -66,19 +69,4 @@ func (s *GRPCServer) AddProductToCart(ctx context.Context, req *cartv1.AddProduc
 		Quantity:  cartProduct.Quantity,
 		Price:     product.Price,
 	}, nil
-}
-
-func (s *GRPCServer) getOrCreateCartByUserID(ctx context.Context, userUUID pgtype.UUID) (repository.Cart, error) {
-	cart, err := s.queries.GetCartByUserID(ctx, userUUID)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			newCart, createErr := s.queries.CreateCart(ctx, userUUID)
-			if createErr != nil {
-				return repository.Cart{}, fmt.Errorf("failed to create a new cart: %w", createErr)
-			}
-			return newCart, nil
-		}
-		return repository.Cart{}, fmt.Errorf("failed to get cart by user id: %w", err)
-	}
-	return cart, nil
 }

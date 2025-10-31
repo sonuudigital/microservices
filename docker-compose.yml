@@ -110,6 +110,7 @@ services:
       MIGRATIONS_DIR: /migrations
       PRODUCT_SERVICE_GRPC_URL: ${PRODUCT_SERVICE_GRPC_URL}
       LOG_LEVEL: ${LOG_LEVEL}
+      CART_TTL_HOURS: ${CART_TTL_HOURS}
     depends_on:
       cart-db:
         condition: service_healthy

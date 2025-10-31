@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	"google.golang.org/grpc/codes"
@@ -20,12 +19,9 @@ func (s *GRPCServer) GetCart(ctx context.Context, req *cartv1.GetCartRequest) (*
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user id format: %s", req.UserId)
 	}
 
-	cart, err := s.queries.GetCartByUserID(ctx, uid)
+	cart, _, err := s.getOrCreateCartByUserID(ctx, uid)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, "cart not found")
-		}
-		return nil, status.Errorf(codes.Internal, "failed to get cart: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to get or create cart: %v", err)
 	}
 
 	cartProducts, err := s.queries.GetCartProductsByCartID(ctx, cart.ID)
