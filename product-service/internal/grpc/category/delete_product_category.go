@@ -36,7 +36,9 @@ func (s *GRPCServer) DeleteProductCategory(ctx context.Context, req *product_cat
 		}
 	}
 
-	go s.deleteProductCategoriesCache()
+	if err := s.deleteProductCategoriesCache(); err != nil {
+		s.logger.Error("failed to delete product categories cache after deletion", "key", allProductCategoriesCacheKey, "error", err)
+	}
 
 	return &emptypb.Empty{}, nil
 }

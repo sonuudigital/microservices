@@ -12,6 +12,7 @@ import (
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
@@ -26,7 +27,7 @@ func TestGetProductsByIDs(t *testing.T) {
 	t.Run("Success - All from Cache", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, redisMock := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		cachedProduct1 := map[string]string{
 			"id":            uuidTest,
@@ -63,7 +64,7 @@ func TestGetProductsByIDs(t *testing.T) {
 	t.Run("Success - Partial Cache, Rest from DB", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, redisMock := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		cachedProduct := map[string]string{
 			"id":            uuidTest,
@@ -102,7 +103,7 @@ func TestGetProductsByIDs(t *testing.T) {
 	t.Run("Success - All from DB", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, redisMock := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		redisMock.ExpectHGetAll(productCachePrefix + uuidTest).SetVal(map[string]string{})
 		redisMock.ExpectHGetAll(productCachePrefix + uuidTest2).SetVal(map[string]string{})
@@ -134,7 +135,7 @@ func TestGetProductsByIDs(t *testing.T) {
 	t.Run("Empty IDs", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		emptyReq := &productv1.GetProductsByIDsRequest{Ids: []string{}}
 
@@ -149,7 +150,7 @@ func TestGetProductsByIDs(t *testing.T) {
 	t.Run("DB Error", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, redisMock := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		redisMock.ExpectHGetAll(productCachePrefix + uuidTest).SetVal(map[string]string{})
 
@@ -174,7 +175,7 @@ func TestGetProductsByIDs(t *testing.T) {
 	t.Run("Redis Pipeline Error - Fallback to DB", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, redisMock := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		redisMock.ExpectHGetAll(productCachePrefix + uuidTest).SetErr(redis.Nil)
 
@@ -203,7 +204,7 @@ func TestGetProductsByIDs(t *testing.T) {
 	t.Run("Invalid UUID Format", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, redisMock := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		invalidReq := &productv1.GetProductsByIDsRequest{
 			Ids: []string{"invalid-uuid"},

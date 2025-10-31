@@ -10,6 +10,7 @@ import (
 	grpc "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
@@ -41,7 +42,7 @@ func testsMalformedUUID(t *testing.T) {
 	req := &productv1.GetProductsByCategoryIDRequest{CategoryId: uuidMalformed}
 	mockQuerier := new(product_service_mock.MockQuerier)
 	redisClient, _ := redismock.NewClientMock()
-	server := grpc.NewServer(mockQuerier, redisClient)
+	server := grpc.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 	_, err := server.GetProductsByCategoryID(context.Background(), req)
 
@@ -96,6 +97,6 @@ func initializeProductService() (*productv1.GetProductsByCategoryIDRequest, *pro
 	req := &productv1.GetProductsByCategoryIDRequest{CategoryId: uuidCategoryTest}
 	mockQuerier := new(product_service_mock.MockQuerier)
 	redisClient, _ := redismock.NewClientMock()
-	server := grpc.NewServer(mockQuerier, redisClient)
+	server := grpc.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 	return req, mockQuerier, server
 }

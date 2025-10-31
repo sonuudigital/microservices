@@ -12,6 +12,7 @@ import (
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	product_service_mock "github.com/sonuudigital/microservices/product-service/internal/mock"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
@@ -27,7 +28,7 @@ func TestGetProduct(t *testing.T) {
 	t.Run("Success - Cache Miss", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, redisMock := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		redisMock.ExpectHGetAll(productCachePrefix + uuidTest).SetVal(map[string]string{})
 
@@ -49,7 +50,7 @@ func TestGetProduct(t *testing.T) {
 	t.Run("Success - Cache Hit", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, redisMock := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		cachedProduct := map[string]string{
 			"id":            uuidTest,
@@ -75,7 +76,7 @@ func TestGetProduct(t *testing.T) {
 	t.Run("Not Found", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, redisMock := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 
 		redisMock.ExpectHGetAll(productCachePrefix + uuidTest).SetVal(map[string]string{})
 
@@ -94,7 +95,7 @@ func TestGetProduct(t *testing.T) {
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(product_service_mock.MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
-		server := grpc_server.NewServer(mockQuerier, redisClient)
+		server := grpc_server.NewServer(logs.NewSlogLogger(), mockQuerier, redisClient)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
