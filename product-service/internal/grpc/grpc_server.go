@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -30,6 +31,27 @@ func NewServer(logger logs.Logger, queries repository.Querier, redisClient *redi
 		queries:     queries,
 		redisClient: redisClient,
 	}
+}
+
+func (s *GRPCServer) cacheProduct(id string, product *productv1.Product) error {
+	cacheKey := productCachePrefix + id
+	ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
+	defer cancel()
+
+	productMap := productToMap(product)
+	pipe := s.redisClient.Pipeline()
+	pipe.HSet(ctx, cacheKey, productMap)
+	pipe.Expire(ctx, cacheKey, cacheExpirationTime)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+func (s *GRPCServer) deleteProductCache(id string) error {
+	cacheKey := productCachePrefix + id
+	ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
+	defer cancel()
+
+	return s.redisClient.Del(ctx, cacheKey).Err()
 }
 
 func toGRPCProduct(p repository.Product) *productv1.Product {

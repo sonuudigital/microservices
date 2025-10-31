@@ -40,14 +40,9 @@ func (s *GRPCServer) GetProduct(ctx context.Context, req *productv1.GetProductRe
 	grpcProduct := toGRPCProduct(product)
 
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), cacheContextTimeout)
-		defer cancel()
-
-		productMap := productToMap(grpcProduct)
-		pipe := s.redisClient.Pipeline()
-		pipe.HSet(ctx, cacheKey, productMap)
-		pipe.Expire(ctx, cacheKey, cacheExpirationTime)
-		pipe.Exec(ctx)
+		if err := s.cacheProduct(req.Id, grpcProduct); err != nil {
+			s.logger.Error("failed to cache product", "key", cacheKey, "error", err)
+		}
 	}()
 
 	return grpcProduct, nil
