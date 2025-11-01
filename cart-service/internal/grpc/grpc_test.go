@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	uuidTest      = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-	productIDTest = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13"
+	uuidTest        = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+	productIDTest   = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13"
+	cartUUIDTest    = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12"
+	cartCachePrefix = "cart:"
 )
 
 type MockQuerier struct {

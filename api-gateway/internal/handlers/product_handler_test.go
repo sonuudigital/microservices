@@ -130,7 +130,6 @@ func TestCreateProductHandler(t *testing.T) {
 		Name:          "New Product",
 		Description:   "New Description",
 		Price:         10.0,
-		Code:          "NEW001",
 		StockQuantity: 10,
 	}
 	body, _ := json.Marshal(productReq)

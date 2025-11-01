@@ -107,12 +107,15 @@ services:
     environment:
       CART_SERVICE_GRPC_PORT: ${CART_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${CART_POSTGRES_USER}:${CART_POSTGRES_PASSWORD}@cart-db:5432/${CART_POSTGRES_DB}?sslmode=disable
+      REDIS_URL: "redis://redis-cache:6379"
       MIGRATIONS_DIR: /migrations
       PRODUCT_SERVICE_GRPC_URL: ${PRODUCT_SERVICE_GRPC_URL}
       LOG_LEVEL: ${LOG_LEVEL}
       CART_TTL_HOURS: ${CART_TTL_HOURS}
     depends_on:
       cart-db:
+        condition: service_healthy
+      redis-cache:
         condition: service_healthy
       product-service:
         condition: service_healthy
@@ -125,6 +128,7 @@ services:
     networks:
       - services-network
       - cart-db-network
+      - redis-network
 
   user-db:
     image: postgres:18-alpine
