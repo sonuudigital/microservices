@@ -16,7 +16,7 @@ func (s *GRPCServer) GetCart(ctx context.Context, req *cartv1.GetCartRequest) (*
 		return nil, status.FromContextError(err).Err()
 	}
 
-	cachedResp, err := s.checkCartCache(req.UserId)
+	cachedResp, err := s.checkCartCache(ctx, req.UserId)
 	if err != nil {
 		s.logger.Error("failed to check cart cache", "userID", req.UserId, "error", err)
 	} else if cachedResp != nil {
@@ -84,18 +84,17 @@ func (s *GRPCServer) GetCart(ctx context.Context, req *cartv1.GetCartRequest) (*
 	return grpcGetCartResponse, nil
 }
 
-func (s *GRPCServer) checkCartCache(userID string) (*cartv1.GetCartResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), redisContextTimeout)
+func (s *GRPCServer) checkCartCache(ctx context.Context, userID string) (*cartv1.GetCartResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, redisContextTimeout)
 	defer cancel()
 
 	cacheKey := redisCartPrefix + userID
 	jsonResp, err := s.redisClient.Get(ctx, cacheKey).Result()
-	if err != nil && len(jsonResp) == 0 {
+	if err != nil {
 		if err == redis.Nil {
 			return nil, nil
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 
 	var resp *cartv1.GetCartResponse

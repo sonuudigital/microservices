@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
+	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -42,6 +42,8 @@ func (s *GRPCServer) RemoveProductFromCart(ctx context.Context, req *cartv1.Remo
 	if err := s.queries.RemoveProductFromCart(ctx, params); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to remove product from cart: %v", err)
 	}
+
+	go s.deleteCartCache(req.UserId)
 
 	return &emptypb.Empty{}, nil
 }
