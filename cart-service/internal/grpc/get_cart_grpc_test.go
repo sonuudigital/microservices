@@ -5,11 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-redis/redismock/v9"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	grpc_server "github.com/sonuudigital/microservices/cart-service/internal/grpc"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -20,7 +22,8 @@ func TestGetCart(t *testing.T) {
 	t.Run("Get existing cart successfully", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
 		mockProductFetcher := new(MockProductFetcher)
-		server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, redisClient, logs.NewSlogLogger())
 
 		req := &cartv1.GetCartRequest{UserId: uuidTest}
 
@@ -52,7 +55,8 @@ func TestGetCart(t *testing.T) {
 	t.Run("Create cart when it does not exist", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
 		mockProductFetcher := new(MockProductFetcher)
-		server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, redisClient, logs.NewSlogLogger())
 
 		req := &cartv1.GetCartRequest{UserId: uuidTest}
 

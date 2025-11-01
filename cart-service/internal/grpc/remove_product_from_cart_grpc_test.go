@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-redis/redismock/v9"
 	"github.com/jackc/pgx/v5/pgtype"
 	grpc_server "github.com/sonuudigital/microservices/cart-service/internal/grpc"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
@@ -17,7 +18,8 @@ func TestRemoveProductFromCart(t *testing.T) {
 	t.Setenv("CART_TTL_HOURS", "24")
 
 	mockQuerier := new(MockQuerier)
-	server := grpc_server.NewGRPCServer(mockQuerier, nil, nil)
+	redisClient, _ := redismock.NewClientMock()
+	server := grpc_server.NewGRPCServer(mockQuerier, nil, redisClient, nil)
 
 	req := &cartv1.RemoveProductFromCartRequest{
 		UserId:    uuidTest,
