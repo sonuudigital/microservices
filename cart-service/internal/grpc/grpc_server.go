@@ -9,9 +9,16 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/redis/go-redis/v9"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	"github.com/sonuudigital/microservices/shared/logs"
+)
+
+const (
+	redisCartPrefix     = "cart:"
+	redisCacheTTL       = time.Hour * 1
+	redisContextTimeout = time.Second * 3
 )
 
 type Product struct {
@@ -29,15 +36,30 @@ type GRPCServer struct {
 	cartv1.UnimplementedCartServiceServer
 	queries        repository.Querier
 	productFetcher ProductFetcher
+	redisClient    *redis.Client
 	logger         logs.Logger
 }
 
-func NewGRPCServer(queries repository.Querier, productFetcher ProductFetcher, logger logs.Logger) *GRPCServer {
+func NewGRPCServer(queries repository.Querier, productFetcher ProductFetcher, redisClient *redis.Client, logger logs.Logger) *GRPCServer {
 	return &GRPCServer{
 		queries:        queries,
 		productFetcher: productFetcher,
+		redisClient:    redisClient,
 		logger:         logger,
 	}
+}
+
+func (s *GRPCServer) deleteCartCache(userID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), redisContextTimeout)
+	defer cancel()
+
+	cacheKey := redisCartPrefix + userID
+	if err := s.redisClient.Del(ctx, cacheKey).Err(); err != nil {
+		s.logger.Error("failed to delete cart cache", "userID", userID, "error", err)
+		return fmt.Errorf("failed to delete cart cache for user %s: %w", userID, err)
+	}
+
+	return nil
 }
 
 func (s *GRPCServer) getOrCreateCartByUserID(ctx context.Context, userUUID pgtype.UUID) (repository.Cart, bool, error) {
