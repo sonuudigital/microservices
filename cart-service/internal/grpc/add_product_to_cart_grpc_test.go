@@ -10,6 +10,7 @@ import (
 	grpc_server "github.com/sonuudigital/microservices/cart-service/internal/grpc"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
+	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -19,8 +20,8 @@ func TestAddProductToCart(t *testing.T) {
 
 	mockQuerier := new(MockQuerier)
 	mockProductFetcher := new(MockProductFetcher)
-	redisClient, _ := redismock.NewClientMock()
-	server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, redisClient, nil)
+	redisClient, redisMock := redismock.NewClientMock()
+	server := grpc_server.NewGRPCServer(mockQuerier, mockProductFetcher, redisClient, logs.NewSlogLogger())
 
 	req := &cartv1.AddProductToCartRequest{
 		UserId:    uuidTest,
@@ -31,7 +32,7 @@ func TestAddProductToCart(t *testing.T) {
 	var userUUID pgtype.UUID
 	_ = userUUID.Scan(uuidTest)
 	var cartUUID pgtype.UUID
-	_ = cartUUID.Scan("b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12")
+	_ = cartUUID.Scan(cartUUIDTest)
 	var productUUID pgtype.UUID
 	_ = productUUID.Scan(productIDTest)
 
@@ -52,7 +53,11 @@ func TestAddProductToCart(t *testing.T) {
 		Quantity:  1,
 	}, nil)
 
+	redisMock.MatchExpectationsInOrder(false)
+	redisMock.ExpectDel(cartCachePrefix + uuidTest).SetVal(1)
+
 	_, err := server.AddProductToCart(context.Background(), req)
 
 	assert.NoError(t, err)
+	mockQuerier.AssertExpectations(t)
 }
