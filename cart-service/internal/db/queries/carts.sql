@@ -21,8 +21,7 @@ INSERT INTO carts_products (cart_id, product_id, quantity, price)
 VALUES (@cart_id, @product_id, @quantity, @price)
 ON CONFLICT (cart_id, product_id)
 DO UPDATE SET
-    quantity = @quantity,
-    price = EXCLUDED.price
+    quantity = @quantity
 RETURNING *;
 
 -- name: RemoveProductFromCart :exec
