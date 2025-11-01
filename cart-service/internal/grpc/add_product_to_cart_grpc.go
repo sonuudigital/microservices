@@ -62,6 +62,8 @@ func (s *GRPCServer) AddProductToCart(ctx context.Context, req *cartv1.AddProduc
 		return nil, status.Errorf(codes.Internal, "failed to add or update product in cart: %v", err)
 	}
 
+	go s.deleteCartCache(req.UserId)
+
 	return &cartv1.AddProductToCartResponse{
 		Id:        cartProduct.ID.String(),
 		CartId:    cartProduct.CartID.String(),

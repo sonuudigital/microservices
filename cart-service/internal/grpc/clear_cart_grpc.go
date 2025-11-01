@@ -32,5 +32,7 @@ func (s *GRPCServer) ClearCart(ctx context.Context, req *cartv1.ClearCartRequest
 		return nil, status.Errorf(codes.Internal, "failed to clear cart: %v", err)
 	}
 
+	go s.deleteCartCache(req.UserId)
+
 	return &emptypb.Empty{}, nil
 }

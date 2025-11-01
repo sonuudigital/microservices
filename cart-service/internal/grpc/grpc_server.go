@@ -17,7 +17,7 @@ import (
 
 const (
 	redisCartPrefix     = "cart:"
-	redisCacheTTL       = time.Hour * 1
+	redisCacheTTL       = time.Minute * 15
 	redisContextTimeout = time.Second * 3
 )
 
@@ -79,6 +79,7 @@ func (s *GRPCServer) getOrCreateCartByUserID(ctx context.Context, userUUID pgtyp
 
 	if expired {
 		newCart, _, deleteErr := s.deleteExpiredCartAndCreateNewOne(ctx, userUUID)
+		go s.deleteCartCache(userUUID.String())
 		return newCart, true, deleteErr
 	}
 
