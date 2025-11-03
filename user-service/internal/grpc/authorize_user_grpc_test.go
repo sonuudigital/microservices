@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/alexedwards/argon2id"
+	"github.com/go-redis/redismock/v9"
 	"github.com/jackc/pgx/v5"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	grpc_server "github.com/sonuudigital/microservices/user-service/internal/grpc"
@@ -26,7 +27,8 @@ func TestAuthorizeUser(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
 		mockQuerier.On("GetUserByEmail", mock.Anything, testEmail).
 			Return(repository.User{
 				Email:    testEmail,
@@ -43,7 +45,8 @@ func TestAuthorizeUser(t *testing.T) {
 
 	t.Run("User Not Found", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
 		mockQuerier.On("GetUserByEmail", mock.Anything, testEmail).
 			Return(repository.User{}, pgx.ErrNoRows).Once()
 
@@ -59,7 +62,8 @@ func TestAuthorizeUser(t *testing.T) {
 
 	t.Run("Wrong Password", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
 		mockQuerier.On("GetUserByEmail", mock.Anything, testEmail).
 			Return(repository.User{
 				Email:    testEmail,
@@ -82,7 +86,8 @@ func TestAuthorizeUser(t *testing.T) {
 
 	t.Run("DB Error", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
 		mockQuerier.On("GetUserByEmail", mock.Anything, testEmail).
 			Return(repository.User{}, errors.New("db error")).Once()
 
@@ -98,7 +103,8 @@ func TestAuthorizeUser(t *testing.T) {
 
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

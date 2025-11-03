@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/go-redis/redismock/v9"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	grpc_server "github.com/sonuudigital/microservices/user-service/internal/grpc"
 	"github.com/sonuudigital/microservices/user-service/internal/repository"
@@ -23,7 +24,8 @@ func TestCreateUser(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
 		mockQuerier.On("CreateUser", mock.Anything, mock.AnythingOfType("repository.CreateUserParams")).
 			Return(repository.User{
 				Username: req.Username,
@@ -41,7 +43,8 @@ func TestCreateUser(t *testing.T) {
 
 	t.Run("DB Error", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
 		mockQuerier.On("CreateUser", mock.Anything, mock.AnythingOfType("repository.CreateUserParams")).
 			Return(repository.User{}, errors.New("db error")).Once()
 
@@ -57,7 +60,8 @@ func TestCreateUser(t *testing.T) {
 
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		server := grpc_server.NewGRPCServer(mockQuerier, nil)
+		redisClient, _ := redismock.NewClientMock()
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

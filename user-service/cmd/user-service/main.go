@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
@@ -38,10 +40,39 @@ func main() {
 	logger.Info("database connected successfully")
 	defer pgDb.Close()
 
-	startGRPCServer(pgDb, logger)
+	redisClient, err := initializeRedisClient()
+	if err != nil {
+		logger.Error("error connecting to redis", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("redis connected successfully")
+	defer redisClient.Close()
+
+	startGRPCServer(pgDb, redisClient, logger)
 }
 
-func startGRPCServer(pgDb *pgxpool.Pool, logger logs.Logger) {
+func initializeRedisClient() (*redis.Client, error) {
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		return nil, fmt.Errorf("REDIS_URL is not set")
+	}
+
+	opts, err := redis.ParseURL(redisURL)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse redis URL: %w", err)
+	}
+
+	client := redis.NewClient(opts)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	if _, err := client.Ping(ctx).Result(); err != nil {
+		return nil, fmt.Errorf("could not ping redis: %w", err)
+	}
+
+	return client, nil
+}
+
+func startGRPCServer(pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.Logger) {
 	grpcPort := os.Getenv("USER_SERVICE_GRPC_PORT")
 	if grpcPort == "" {
 		logger.Error("USER_SERVICE_GRPC_PORT is not set")
@@ -56,7 +87,7 @@ func startGRPCServer(pgDb *pgxpool.Pool, logger logs.Logger) {
 
 	queries := repository.New(pgDb)
 	grpcServer := grpc.NewServer()
-	userServer := grpc_server.NewGRPCServer(queries, logger)
+	userServer := grpc_server.NewGRPCServer(queries, redisClient, logger)
 	userv1.RegisterUserServiceServer(grpcServer, userServer)
 
 	healthServer := health.NewServer()
