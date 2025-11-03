@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-redis/redismock/v9"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
@@ -25,13 +26,17 @@ func TestCreateUser(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
-		redisClient, _ := redismock.NewClientMock()
+		redisClient, redisMock := redismock.NewClientMock()
 		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, logs.NewSlogLogger())
 		mockQuerier.On("CreateUser", mock.Anything, mock.AnythingOfType("repository.CreateUserParams")).
 			Return(repository.User{
 				Username: req.Username,
 				Email:    req.Email,
 			}, nil).Once()
+
+		redisMock.MatchExpectationsInOrder(false)
+		redisMock.ExpectHSet(mock.Anything, mock.Anything).SetVal(1)
+		redisMock.ExpectExpire(mock.Anything, 24*time.Hour).SetVal(true)
 
 		res, err := server.CreateUser(context.Background(), req)
 
