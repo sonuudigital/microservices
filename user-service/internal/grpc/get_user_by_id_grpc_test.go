@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
+	"github.com/sonuudigital/microservices/shared/logs"
 	grpc_server "github.com/sonuudigital/microservices/user-service/internal/grpc"
 	"github.com/sonuudigital/microservices/user-service/internal/repository"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +26,7 @@ func TestGetUserByID(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
-		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, logs.NewSlogLogger())
 		mockQuerier.On("GetUserByID", mock.Anything, pgUUID).
 			Return(repository.User{
 				ID:    pgUUID,
@@ -44,7 +45,7 @@ func TestGetUserByID(t *testing.T) {
 	t.Run("Not Found", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
-		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, logs.NewSlogLogger())
 		mockQuerier.On("GetUserByID", mock.Anything, pgUUID).
 			Return(repository.User{}, pgx.ErrNoRows).Once()
 
@@ -61,7 +62,7 @@ func TestGetUserByID(t *testing.T) {
 	t.Run("Invalid ID", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
-		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, logs.NewSlogLogger())
 		invalidReq := &userv1.GetUserByIDRequest{Id: "invalid-uuid"}
 		res, err := server.GetUserByID(context.Background(), invalidReq)
 
@@ -75,7 +76,7 @@ func TestGetUserByID(t *testing.T) {
 	t.Run("Context Canceled", func(t *testing.T) {
 		mockQuerier := new(MockQuerier)
 		redisClient, _ := redismock.NewClientMock()
-		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, nil)
+		server := grpc_server.NewGRPCServer(mockQuerier, redisClient, logs.NewSlogLogger())
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
