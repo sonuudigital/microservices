@@ -51,10 +51,13 @@ services:
     environment:
       USER_SERVICE_GRPC_PORT: ${USER_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${USER_POSTGRES_USER}:${USER_POSTGRES_PASSWORD}@user-db:5432/${USER_POSTGRES_DB}?sslmode=disable
+      REDIS_URL: "redis://redis-cache:6379"
       MIGRATIONS_DIR: /migrations
       LOG_LEVEL: ${LOG_LEVEL}
     depends_on:
       user-db:
+        condition: service_healthy
+      redis-cache:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/grpc_health_probe", "-addr=:${USER_SERVICE_GRPC_PORT}", "-service=user-service"]
@@ -65,6 +68,7 @@ services:
     networks:
       - services-network
       - user-db-network
+      - redis-network
 
   product-service:
     container_name: product-service
