@@ -14,7 +14,6 @@ import (
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/web"
-	"golang.org/x/time/rate"
 
 	"github.com/joho/godotenv"
 )
@@ -148,29 +147,10 @@ func initializeRateLimiterMiddleware(logger logs.Logger) *middlewares.RateLimite
 		rateLimiterEnabled = false
 	}
 
-	unknownRPS, err := strconv.ParseFloat(os.Getenv("RATE_LIMITER_UNKNOWN_RPS"), 64)
-	if err != nil {
-		logger.Info("rate limiter unknown rps not found, using default 5")
-		unknownRPS = 5
-	}
-
-	unknownBurst, err := strconv.Atoi(os.Getenv("RATE_LIMITER_UNKNOWN_BURST"))
-	if err != nil {
-		logger.Info("rate limiter unknown burst not found, using default 10")
-		unknownBurst = 10
-	}
-
-	authRPS, err := strconv.ParseFloat(os.Getenv("RATE_LIMITER_AUTH_RPS"), 64)
-	if err != nil {
-		logger.Info("rate limiter authenticated rps not found, using default 20")
-		authRPS = 20
-	}
-
-	authBurst, err := strconv.Atoi(os.Getenv("RATE_LIMITER_AUTH_BURST"))
-	if err != nil {
-		logger.Info("rate limiter authenticated burst not found, using default 40")
-		authBurst = 40
-	}
+	unknownRPS := getEnvInt(logger, "RATE_LIMITER_UNKNOWN_RPS", 5)
+	unknownBurst := getEnvInt(logger, "RATE_LIMITER_UNKNOWN_BURST", 10)
+	authRPS := getEnvInt(logger, "RATE_LIMITER_AUTH_RPS", 20)
+	authBurst := getEnvInt(logger, "RATE_LIMITER_AUTH_BURST", 40)
 
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
@@ -196,12 +176,12 @@ func initializeRateLimiterMiddleware(logger logs.Logger) *middlewares.RateLimite
 
 	rateLimits := map[int]middlewares.RateLimitConfig{
 		middlewares.UnknownClient: {
-			Rate:  rate.Limit(unknownRPS),
-			Burst: unknownBurst,
+			RatePerSecond: unknownRPS,
+			Burst:         unknownBurst,
 		},
 		middlewares.AuthenticatedClient: {
-			Rate:  rate.Limit(authRPS),
-			Burst: authBurst,
+			RatePerSecond: authRPS,
+			Burst:         authBurst,
 		},
 	}
 
@@ -215,4 +195,13 @@ func initializeRateLimiterMiddleware(logger logs.Logger) *middlewares.RateLimite
 	)
 
 	return middlewares.NewRateLimiterMiddleware(logger, rateLimits, rateLimiter, rateLimiterEnabled)
+}
+
+func getEnvInt(logger logs.Logger, key string, fallback int) int {
+	val, err := strconv.Atoi(os.Getenv(key))
+	if err != nil {
+		logger.Info(key+" not found, using default", "default", fallback)
+		return fallback
+	}
+	return val
 }
