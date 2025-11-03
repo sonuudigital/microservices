@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"github.com/redis/go-redis/v9"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/user-service/internal/repository"
@@ -9,14 +10,16 @@ import (
 
 type GRPCServer struct {
 	userv1.UnimplementedUserServiceServer
-	queries repository.Querier
-	logger  logs.Logger
+	queries     repository.Querier
+	redisClient *redis.Client
+	logger      logs.Logger
 }
 
-func NewGRPCServer(queries repository.Querier, logger logs.Logger) *GRPCServer {
+func NewGRPCServer(queries repository.Querier, redisClient *redis.Client, logger logs.Logger) *GRPCServer {
 	return &GRPCServer{
-		queries: queries,
-		logger:  logger,
+		queries:     queries,
+		redisClient: redisClient,
+		logger:      logger,
 	}
 }
 

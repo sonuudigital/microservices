@@ -6,6 +6,7 @@ require (
 	github.com/alexedwards/argon2id v1.0.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
+	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sonuudigital/microservices/gen v0.0.0-00010101000000-000000000000
 	github.com/sonuudigital/microservices/shared v0.0.0-20251022201705-f3843615e342
 	github.com/stretchr/testify v1.11.1
@@ -14,7 +15,9 @@ require (
 )
 
 require (
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang-migrate/migrate/v4 v4.19.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect

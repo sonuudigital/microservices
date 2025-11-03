@@ -47,6 +47,7 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("redis connected successfully")
+	defer redisClient.Close()
 
 	startGRPCServer(pgDb, redisClient, logger)
 }
