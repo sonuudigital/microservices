@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -107,11 +108,15 @@ func startGRPCServer(pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.
 
 	go func() {
 		healthServer.SetServingStatus("cart-service", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
-		if err := pgDb.Ping(context.Background()); err == nil {
+		dbErr := pgDb.Ping(context.Background())
+		redisErr := redisClient.Ping(context.Background()).Err()
+
+		if dbErr == nil && redisErr == nil {
 			logger.Info("service is healthy and serving")
 			healthServer.SetServingStatus("cart-service", grpc_health_v1.HealthCheckResponse_SERVING)
 		} else {
-			logger.Error("service is not healthy", "error", err)
+			errors := errors.Join(dbErr, redisErr)
+			logger.Error("service is not healthy", "errors", errors)
 		}
 	}()
 
