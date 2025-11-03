@@ -2,9 +2,11 @@ package grpc
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/redis/go-redis/v9"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -13,6 +15,23 @@ import (
 func (s *GRPCServer) GetUserByID(ctx context.Context, req *userv1.GetUserByIDRequest) (*userv1.User, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, status.FromContextError(err).Err()
+	}
+
+	cachedUser, err := s.checkUserCache(ctx, req.Id)
+	if err == nil {
+		return &userv1.User{
+			Id:        cachedUser.Id,
+			Username:  cachedUser.Username,
+			Email:     cachedUser.Email,
+			CreatedAt: cachedUser.CreatedAt,
+			UpdatedAt: cachedUser.UpdatedAt,
+		}, nil
+	} else {
+		if errors.Is(err, redis.Nil) {
+			s.logger.Info("user not found in cache", "userID", req.Id)
+		} else {
+			s.logger.Error("failed to check user cache", "userID", req.Id, "error", err)
+		}
 	}
 
 	var uid pgtype.UUID
@@ -28,5 +47,7 @@ func (s *GRPCServer) GetUserByID(ctx context.Context, req *userv1.GetUserByIDReq
 		return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)
 	}
 
-	return toGRPCUser(user), nil
+	grpcUser := toGRPCUser(user)
+	go s.cacheUser(grpcUser, user.Password)
+	return grpcUser, nil
 }

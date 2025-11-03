@@ -32,5 +32,7 @@ func (s *GRPCServer) CreateUser(ctx context.Context, req *userv1.CreateUserReque
 		return nil, status.Errorf(codes.Internal, "failed to create user: %v", err)
 	}
 
-	return toGRPCUser(user), nil
+	grpcUser := toGRPCUser(user)
+	go s.cacheUser(grpcUser, hashedPassword)
+	return grpcUser, nil
 }
