@@ -15,6 +15,7 @@ service ProductService {
   rpc UpdateProduct(UpdateProductRequest) returns (Product);
   rpc DeleteProduct(DeleteProductRequest) returns (google.protobuf.Empty);
   rpc GetProductsByCategoryID(GetProductsByCategoryIDRequest) returns (GetProductsByCategoryIDResponse);
+  rpc UpdateStockBatch(UpdateStockBatchRequest) returns (google.protobuf.Empty);
 }
 
 message Product {
@@ -26,6 +27,15 @@ message Product {
   int32 stock_quantity = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+}
+
+message StockUpdate {
+  string id = 1;
+  int32 quantity = 2;
+}
+
+message UpdateStockBatchRequest {
+  repeated StockUpdate updates = 1;
 }
 
 message GetProductsByIDsRequest {

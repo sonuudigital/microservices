@@ -19,6 +19,7 @@ func (s *GRPCServer) GetUserByID(ctx context.Context, req *userv1.GetUserByIDReq
 
 	cachedUser, err := s.checkUserCache(ctx, req.Id)
 	if err == nil {
+		s.logger.Debug("user retrieved from cache", "userID", req.Id)
 		return &userv1.User{
 			Id:        cachedUser.Id,
 			Username:  cachedUser.Username,

@@ -4,6 +4,7 @@ go 1.25.3
 
 require (
 	github.com/alexedwards/argon2id v1.0.0
+	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
 	github.com/redis/go-redis/v9 v9.16.0
