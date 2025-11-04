@@ -239,3 +239,18 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 	)
 	return i, err
 }
+
+const updateStockBatch = `-- name: UpdateStockBatch :exec
+UPDATE products
+SET
+  stock_quantity = products.stock_quantity - p.quantity
+FROM
+  json_to_recordset($1::json) AS p(id uuid, quantity int)
+WHERE
+  products.id = p.id
+`
+
+func (q *Queries) UpdateStockBatch(ctx context.Context, updateParams []byte) error {
+	_, err := q.db.Exec(ctx, updateStockBatch, updateParams)
+	return err
+}

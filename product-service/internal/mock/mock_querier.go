@@ -90,3 +90,8 @@ func (m *MockQuerier) DeleteProductCategory(ctx context.Context, id pgtype.UUID)
 	args := m.Called(ctx, id)
 	return args.Error(0)
 }
+
+func (m *MockQuerier) UpdateStockBatch(ctx context.Context, updatesJSON []byte) error {
+	args := m.Called(ctx, updatesJSON)
+	return args.Error(0)
+}

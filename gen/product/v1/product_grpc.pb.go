@@ -27,6 +27,7 @@ const (
 	ProductService_UpdateProduct_FullMethodName           = "/product.v1.ProductService/UpdateProduct"
 	ProductService_DeleteProduct_FullMethodName           = "/product.v1.ProductService/DeleteProduct"
 	ProductService_GetProductsByCategoryID_FullMethodName = "/product.v1.ProductService/GetProductsByCategoryID"
+	ProductService_UpdateStockBatch_FullMethodName        = "/product.v1.ProductService/UpdateStockBatch"
 )
 
 // ProductServiceClient is the client API for ProductService service.
@@ -40,6 +41,7 @@ type ProductServiceClient interface {
 	UpdateProduct(ctx context.Context, in *UpdateProductRequest, opts ...grpc.CallOption) (*Product, error)
 	DeleteProduct(ctx context.Context, in *DeleteProductRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetProductsByCategoryID(ctx context.Context, in *GetProductsByCategoryIDRequest, opts ...grpc.CallOption) (*GetProductsByCategoryIDResponse, error)
+	UpdateStockBatch(ctx context.Context, in *UpdateStockBatchRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type productServiceClient struct {
@@ -120,6 +122,16 @@ func (c *productServiceClient) GetProductsByCategoryID(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *productServiceClient) UpdateStockBatch(ctx context.Context, in *UpdateStockBatchRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, ProductService_UpdateStockBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProductServiceServer is the server API for ProductService service.
 // All implementations must embed UnimplementedProductServiceServer
 // for forward compatibility
@@ -131,6 +143,7 @@ type ProductServiceServer interface {
 	UpdateProduct(context.Context, *UpdateProductRequest) (*Product, error)
 	DeleteProduct(context.Context, *DeleteProductRequest) (*emptypb.Empty, error)
 	GetProductsByCategoryID(context.Context, *GetProductsByCategoryIDRequest) (*GetProductsByCategoryIDResponse, error)
+	UpdateStockBatch(context.Context, *UpdateStockBatchRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedProductServiceServer()
 }
 
@@ -158,6 +171,9 @@ func (UnimplementedProductServiceServer) DeleteProduct(context.Context, *DeleteP
 }
 func (UnimplementedProductServiceServer) GetProductsByCategoryID(context.Context, *GetProductsByCategoryIDRequest) (*GetProductsByCategoryIDResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProductsByCategoryID not implemented")
+}
+func (UnimplementedProductServiceServer) UpdateStockBatch(context.Context, *UpdateStockBatchRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateStockBatch not implemented")
 }
 func (UnimplementedProductServiceServer) mustEmbedUnimplementedProductServiceServer() {}
 
@@ -298,6 +314,24 @@ func _ProductService_GetProductsByCategoryID_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductService_UpdateStockBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateStockBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).UpdateStockBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_UpdateStockBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).UpdateStockBatch(ctx, req.(*UpdateStockBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProductService_ServiceDesc is the grpc.ServiceDesc for ProductService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -332,6 +366,10 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetProductsByCategoryID",
 			Handler:    _ProductService_GetProductsByCategoryID_Handler,
+		},
+		{
+			MethodName: "UpdateStockBatch",
+			Handler:    _ProductService_UpdateStockBatch_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

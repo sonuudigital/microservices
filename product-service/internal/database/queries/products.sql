@@ -32,6 +32,15 @@ SET
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateStockBatch :exec
+UPDATE products
+SET
+  stock_quantity = products.stock_quantity - p.quantity
+FROM
+  json_to_recordset(sqlc.arg(update_params)::json) AS p(id uuid, quantity int)
+WHERE
+  products.id = p.id;
+
 -- name: DeleteProduct :exec
 DELETE FROM products
 WHERE id = $1;
