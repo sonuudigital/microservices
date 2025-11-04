@@ -85,6 +85,14 @@ func (m *mockProductServiceClient) GetProductsByCategoryID(ctx context.Context, 
 	return args.Get(0).(*productv1.GetProductsByCategoryIDResponse), args.Error(1)
 }
 
+func (m *mockProductServiceClient) UpdateStockBatch(ctx context.Context, in *productv1.UpdateStockBatchRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*emptypb.Empty), args.Error(1)
+}
+
 func TestGetProductHandler(t *testing.T) {
 	logger := logs.NewSlogLogger()
 	mockClient := new(mockProductServiceClient)
