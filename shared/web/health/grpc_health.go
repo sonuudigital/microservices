@@ -2,7 +2,6 @@ package health
 
 import (
 	"context"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -16,11 +15,8 @@ func StartGRPCHealthCheckService(grpcServer *grpc.Server, service string, health
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
-
 		healthServer.SetServingStatus(service, grpc_health_v1.HealthCheckResponse_NOT_SERVING)
-		if err := healthCheckFn(ctx); err == nil {
+		if err := healthCheckFn(context.Background()); err == nil {
 			healthServer.SetServingStatus(service, grpc_health_v1.HealthCheckResponse_SERVING)
 		}
 	}()
