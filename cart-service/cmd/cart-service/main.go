@@ -17,9 +17,8 @@ import (
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/web"
+	"github.com/sonuudigital/microservices/shared/web/health"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
-	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/joho/godotenv"
 )
@@ -103,22 +102,19 @@ func startGRPCServer(pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.
 	cartServer := grpc_server.NewGRPCServer(queries, productClient, redisClient, logger)
 	cartv1.RegisterCartServiceServer(grpcServer, cartServer)
 
-	healthServer := health.NewServer()
-	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
-
-	go func() {
-		healthServer.SetServingStatus("cart-service", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
-		dbErr := pgDb.Ping(context.Background())
-		redisErr := redisClient.Ping(context.Background()).Err()
+	health.StartGRPCHealthCheckService(grpcServer, "cart-service", func(ctx context.Context) error {
+		dbErr := pgDb.Ping(ctx)
+		redisErr := redisClient.Ping(ctx).Err()
 
 		if dbErr == nil && redisErr == nil {
 			logger.Info("service is healthy and serving")
-			healthServer.SetServingStatus("cart-service", grpc_health_v1.HealthCheckResponse_SERVING)
+			return nil
 		} else {
 			errors := errors.Join(dbErr, redisErr)
 			logger.Error("service is not healthy", "errors", errors)
+			return errors
 		}
-	}()
+	})
 
 	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
 }
