@@ -134,6 +134,32 @@ services:
       - cart-db-network
       - redis-network
 
+  payment-service:
+    container_name: payment-service
+    hostname: payment-service
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    expose:
+      - "${PAYMENT_SERVICE_GRPC_PORT}"
+    environment:
+      PAYMENT_SERVICE_GRPC_PORT: ${PAYMENT_SERVICE_GRPC_PORT}
+      DATABASE_URL: postgres://${PAYMENT_POSTGRES_USER}:${PAYMENT_POSTGRES_PASSWORD}@payment-db:5432/${PAYMENT_POSTGRES_DB}?sslmode=disable
+      MIGRATIONS_DIR: /migrations
+      LOG_LEVEL: ${LOG_LEVEL}
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/grpc_health_probe", "-addr=:${PAYMENT_SERVICE_GRPC_PORT}", "-service=payment-service"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - services-network
+      - payment-db-network
+
   user-db:
     image: postgres:18-alpine
     container_name: user-db
@@ -194,6 +220,26 @@ services:
       timeout: 3s
       retries: 10
 
+  payment-db:
+    image: postgres:18-alpine
+    container_name: payment-db
+    hostname: payment-db
+    environment:
+      POSTGRES_DB: ${PAYMENT_POSTGRES_DB}
+      POSTGRES_USER: ${PAYMENT_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PAYMENT_POSTGRES_PASSWORD}
+    ports:
+      - "${PAYMENT_DATABASE_PORT}:5432"
+    volumes:
+      - payment_db_data:/var/lib/postgresql/data
+    networks:
+      - payment-db-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PAYMENT_POSTGRES_USER} -d ${PAYMENT_POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   redis-cache:
     image: redis:8.2.2-alpine3.22
     container_name: redis-cache
@@ -226,10 +272,13 @@ services:
         condition: service_healthy
       cart-db:
         condition: service_healthy
+      payment-db:
+        condition: service_healthy
     networks:
       - user-db-network
       - product-db-network
       - cart-db-network
+      - payment-db-network
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
@@ -238,11 +287,13 @@ networks:
   user-db-network:
   product-db-network:
   cart-db-network:
+  payment-db-network:
   redis-network:
 
 volumes:
   user_db_data:
   product_db_data:
   cart_db_data:
+  payment_db_data:
   redis_data:
   pgadmin_data:
