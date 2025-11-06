@@ -12,8 +12,8 @@ import (
 )
 
 const createPayment = `-- name: CreatePayment :one
-INSERT INTO payments (order_id, user_id, amount, status)
-VALUES ($1, $2, $3, $4)
+INSERT INTO payments (order_id, user_id, amount)
+VALUES ($1, $2, $3)
 RETURNING id, order_id, user_id, amount, status, created_at
 `
 
@@ -21,16 +21,10 @@ type CreatePaymentParams struct {
 	OrderID pgtype.UUID    `json:"orderId"`
 	UserID  pgtype.UUID    `json:"userId"`
 	Amount  pgtype.Numeric `json:"amount"`
-	Status  pgtype.UUID    `json:"status"`
 }
 
 func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error) {
-	row := q.db.QueryRow(ctx, createPayment,
-		arg.OrderID,
-		arg.UserID,
-		arg.Amount,
-		arg.Status,
-	)
+	row := q.db.QueryRow(ctx, createPayment, arg.OrderID, arg.UserID, arg.Amount)
 	var i Payment
 	err := row.Scan(
 		&i.ID,
@@ -62,10 +56,23 @@ func (q *Queries) GetPaymentByID(ctx context.Context, id pgtype.UUID) (Payment, 
 	return i, err
 }
 
-const updatePaymentStatus = `-- name: UpdatePaymentStatus :exec
+const getPaymentStatusByName = `-- name: GetPaymentStatusByName :one
+SELECT id FROM payment_statuses
+WHERE name = $1
+`
+
+func (q *Queries) GetPaymentStatusByName(ctx context.Context, name string) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getPaymentStatusByName, name)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const updatePaymentStatus = `-- name: UpdatePaymentStatus :one
 UPDATE payments
 SET status = $2
 WHERE id = $1
+RETURNING id, order_id, user_id, amount, status, created_at
 `
 
 type UpdatePaymentStatusParams struct {
@@ -73,7 +80,16 @@ type UpdatePaymentStatusParams struct {
 	Status pgtype.UUID `json:"status"`
 }
 
-func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) error {
-	_, err := q.db.Exec(ctx, updatePaymentStatus, arg.ID, arg.Status)
-	return err
+func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, updatePaymentStatus, arg.ID, arg.Status)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.OrderID,
+		&i.UserID,
+		&i.Amount,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
 	"github.com/sonuudigital/microservices/payment-service/internal/grpc/payment"
+	"github.com/sonuudigital/microservices/payment-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/web"
@@ -52,7 +53,7 @@ func startGRPCServer(logger logs.Logger, pgDb *pgxpool.Pool) {
 	}
 
 	grpcServer := grpc.NewServer()
-	paymentGrpcServer := payment.New(logger)
+	paymentGrpcServer := payment.New(logger, repository.New(pgDb))
 	paymentv1.RegisterPaymentServiceServer(grpcServer, paymentGrpcServer)
 
 	health.StartGRPCHealthCheckService(grpcServer, "payment-service", func(ctx context.Context) error {

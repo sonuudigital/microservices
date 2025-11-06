@@ -11,7 +11,13 @@ CREATE TABLE IF NOT EXISTS payments (
     order_id UUID UNIQUE NOT NULL,
     user_id UUID NOT NULL,
     amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 0),
-    status UUID NOT NULL,
+    status UUID NOT NULL DEFAULT (SELECT id FROM payment_statuses WHERE name = 'PROCESSING'),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     FOREIGN KEY (status) REFERENCES payment_statuses(id)
 );
+
+INSERT INTO payment_statuses (name)
+VALUES
+    ('PROCESSING'),
+    ('SUCCEEDED'),
+    ('REJECTED');
