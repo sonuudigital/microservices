@@ -2,6 +2,7 @@ package payment
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
@@ -60,8 +61,12 @@ func validateProcessPaymentRequest(req *paymentv1.ProcessPaymentRequest) (*proce
 	}
 
 	var amount pgtype.Numeric
-	if err := amount.Scan(req.Amount); err != nil {
+	if err := amount.Scan(fmt.Sprintf("%.2f", req.Amount)); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid amount format: %f", req.Amount)
+	}
+
+	if req.Amount <= 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "amount must be positive: %f", req.Amount)
 	}
 
 	return &processPaymentReqValidationResult{
