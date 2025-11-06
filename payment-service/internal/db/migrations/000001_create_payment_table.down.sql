@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS payment_statuses;
+DROP TABLE IF EXISTS payments;
+DROP EXTENSION IF EXISTS "uuid-ossp";

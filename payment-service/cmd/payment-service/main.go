@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
 	"github.com/sonuudigital/microservices/payment-service/internal/grpc/payment"
 	"github.com/sonuudigital/microservices/shared/logs"
+	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/web"
 	"github.com/sonuudigital/microservices/shared/web/health"
 	"google.golang.org/grpc"
@@ -23,10 +26,19 @@ func main() {
 	} else {
 		logger.Info("no .env file found, using environment variables")
 	}
-	startGRPCServer(logger)
+
+	pgDb, err := postgres.InitializePostgresDB()
+	if err != nil {
+		logger.Error("error connecting to database", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("database connected successfully")
+	defer pgDb.Close()
+
+	startGRPCServer(logger, pgDb)
 }
 
-func startGRPCServer(logger logs.Logger) {
+func startGRPCServer(logger logs.Logger, pgDb *pgxpool.Pool) {
 	grpcPort := os.Getenv("PAYMENT_SERVICE_GRPC_PORT")
 	if grpcPort == "" {
 		logger.Error("PAYMENT_SERVICE_GRPC_PORT is not set")
@@ -44,8 +56,16 @@ func startGRPCServer(logger logs.Logger) {
 	paymentv1.RegisterPaymentServiceServer(grpcServer, paymentGrpcServer)
 
 	health.StartGRPCHealthCheckService(grpcServer, "payment-service", func(ctx context.Context) error {
-		logger.Info("service is healthy and serving")
-		return nil
+		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+		defer cancel()
+
+		if err := pgDb.Ping(ctx); err == nil {
+			logger.Info("service is healthy and serving")
+			return nil
+		} else {
+			logger.Error("service is not healthy", "error", err)
+			return err
+		}
 	})
 
 	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
