@@ -2,7 +2,9 @@ package payment
 
 import (
 	"context"
+	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
 	"google.golang.org/grpc/codes"
@@ -20,6 +22,19 @@ func (s *Server) GetPayment(ctx context.Context, req *paymentv1.GetPaymentReques
 		return nil, status.Errorf(codes.InvalidArgument, "invalid payment id format: %s", req.Id)
 	}
 
-	//TODO: implement payment retrieval logic
-	return nil, status.Errorf(codes.Unimplemented, "method GetPayment not implemented")
+	payment, err := s.querier.GetPaymentByID(ctx, uuid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "payment with id %s not found", req.Id)
+		} else {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve payment: %v", err)
+		}
+	}
+
+	grpcPayment, err := toGRPCPayment(&payment)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert payment: %v", err)
+	}
+
+	return grpcPayment, nil
 }

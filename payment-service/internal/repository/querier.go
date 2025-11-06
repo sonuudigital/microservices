@@ -13,7 +13,8 @@ import (
 type Querier interface {
 	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
 	GetPaymentByID(ctx context.Context, id pgtype.UUID) (Payment, error)
-	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) error
+	GetPaymentStatusByName(ctx context.Context, name string) (pgtype.UUID, error)
+	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) (Payment, error)
 }
 
 var _ Querier = (*Queries)(nil)
