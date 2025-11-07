@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package order.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/sonuudigital/microservices/gen/order/v1;orderv1";
+
+service OrderService {
+    rpc CreateOrder(CreateOrderRequest) returns (Order);
+}
+
+message CreateOrderRequest {
+    string user_id = 1;
+}
+
+message Order {
+    string id = 1;
+    string user_id = 2;
+    double total_amount = 3;
+    string status = 4;
+    google.protobuf.Timestamp created_at = 5;
+}
