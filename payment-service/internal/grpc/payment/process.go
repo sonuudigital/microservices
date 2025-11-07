@@ -41,7 +41,7 @@ func (s *Server) ProcessPayment(ctx context.Context, req *paymentv1.ProcessPayme
 		return nil, err
 	}
 
-	gRPCPayment, err := toGRPCPayment(repositoryPayment)
+	gRPCPayment, err := mapRepositoryToGRPC(repositoryPayment)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert payment: %v", err)
 	}
