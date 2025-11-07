@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS payment_statuses (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
+CREATE UNIQUE INDEX idx_payment_status_name ON payment_statuses(name);
+
 INSERT INTO payment_statuses (name)
 VALUES
     ('PROCESSING'),

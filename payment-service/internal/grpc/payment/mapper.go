@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func toGRPCPayment(p *repository.Payment) (*paymentv1.Payment, error) {
+func mapRepositoryToGRPC(p *repository.Payment) (*paymentv1.Payment, error) {
 	amountFloat, err := p.Amount.Float64Value()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert amount to float64: %w", err)
