@@ -8,3 +8,8 @@ UPDATE orders
 SET status = $2
 WHERE id = $1
 RETURNING *;
+
+-- name: GetOrderStatusIDByName :one
+SELECT id
+FROM order_statuses
+WHERE name = $1;

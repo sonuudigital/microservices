@@ -6,10 +6,13 @@ package repository
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error)
+	GetOrderStatusIDByName(ctx context.Context, name string) (pgtype.UUID, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
 }
 
