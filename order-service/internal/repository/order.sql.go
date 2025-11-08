@@ -35,6 +35,19 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order
 	return i, err
 }
 
+const getOrderStatusIDByName = `-- name: GetOrderStatusIDByName :one
+SELECT id
+FROM order_statuses
+WHERE name = $1
+`
+
+func (q *Queries) GetOrderStatusIDByName(ctx context.Context, name string) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getOrderStatusIDByName, name)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const updateOrderStatus = `-- name: UpdateOrderStatus :one
 UPDATE orders
 SET status = $2
