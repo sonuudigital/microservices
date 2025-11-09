@@ -318,4 +318,5 @@ volumes:
   cart_db_data:
   payment_db_data:
   redis_data:
+  rabbitmq_data:
   pgadmin_data:
