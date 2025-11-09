@@ -26,7 +26,7 @@ services:
       RATE_LIMITER_UNKNOWN_BURST: ${RATE_LIMITER_UNKNOWN_BURST}
       RATE_LIMITER_AUTH_RPS: ${RATE_LIMITER_AUTH_RPS}
       RATE_LIMITER_AUTH_BURST: ${RATE_LIMITER_AUTH_BURST}
-      REDIS_URL: "redis://redis-cache:6379"
+      REDIS_URL: ${REDIS_URL}:${REDIS_PORT}
     depends_on:
       user-service:
         condition: service_healthy
@@ -51,7 +51,7 @@ services:
     environment:
       USER_SERVICE_GRPC_PORT: ${USER_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${USER_POSTGRES_USER}:${USER_POSTGRES_PASSWORD}@user-db:5432/${USER_POSTGRES_DB}?sslmode=disable
-      REDIS_URL: "redis://redis-cache:6379"
+      REDIS_URL: ${REDIS_URL}:${REDIS_PORT}
       MIGRATIONS_DIR: /migrations
       LOG_LEVEL: ${LOG_LEVEL}
     depends_on:
@@ -81,7 +81,7 @@ services:
     environment:
       PRODUCT_SERVICE_GRPC_PORT: ${PRODUCT_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${PRODUCT_POSTGRES_USER}:${PRODUCT_POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_POSTGRES_DB}?sslmode=disable
-      REDIS_URL: "redis://redis-cache:6379"
+      REDIS_URL: ${REDIS_URL}:${REDIS_PORT}
       MIGRATIONS_DIR: /migrations
       LOG_LEVEL: ${LOG_LEVEL}
     depends_on:
@@ -111,7 +111,7 @@ services:
     environment:
       CART_SERVICE_GRPC_PORT: ${CART_SERVICE_GRPC_PORT}
       DATABASE_URL: postgres://${CART_POSTGRES_USER}:${CART_POSTGRES_PASSWORD}@cart-db:5432/${CART_POSTGRES_DB}?sslmode=disable
-      REDIS_URL: "redis://redis-cache:6379"
+      REDIS_URL: ${REDIS_URL}:${REDIS_PORT}
       MIGRATIONS_DIR: /migrations
       PRODUCT_SERVICE_GRPC_URL: ${PRODUCT_SERVICE_GRPC_URL}
       LOG_LEVEL: ${LOG_LEVEL}
@@ -240,22 +240,6 @@ services:
       timeout: 3s
       retries: 10
 
-  redis-cache:
-    image: redis:8.2.2-alpine3.22
-    container_name: redis-cache
-    hostname: redis-cache
-    expose:
-      - "6379"
-    networks:
-      - redis-network
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   pgadmin:
     image: dpage/pgadmin4:9.9.0
     hostname: pgadmin
@@ -282,6 +266,43 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
+  redis-cache:
+    image: redis:8.2.2-alpine3.22
+    container_name: redis-cache
+    hostname: redis-cache
+    expose:
+      - ${REDIS_PORT}
+    networks:
+      - redis-network
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4.2-alpine
+    container_name: rabbitmq
+    hostname: rabbitmq
+    expose:
+      - "5672"
+    ports:
+      - "${RABBITMQ_INTERFACE_PORT}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    networks:
+      - rabbitmq-network
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   services-network:
   user-db-network:
@@ -289,6 +310,7 @@ networks:
   cart-db-network:
   payment-db-network:
   redis-network:
+  rabbitmq-network:
 
 volumes:
   user_db_data:
