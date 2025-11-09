@@ -17,12 +17,12 @@ type RabbitMQ struct {
 func NewConnection(logger logs.Logger, url string) (*RabbitMQ, error) {
 	conn, err := amqp.Dial(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
+		return nil, err
 	}
 
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, fmt.Errorf("failed to open a channel: %w", err)
+		return nil, err
 	}
 
 	logger.Info("Connected to RabbitMQ", "url", url)
@@ -33,17 +33,7 @@ func NewConnection(logger logs.Logger, url string) (*RabbitMQ, error) {
 	}, nil
 }
 
-func (r *RabbitMQ) Close() {
-	if r.channel != nil {
-		r.channel.Close()
-	}
-	if r.connection != nil {
-		r.connection.Close()
-	}
-	r.logger.Info("RabbitMQ connection closed")
-}
-
-func (r *RabbitMQ) Publish(ctx context.Context, exchange, routingKey string, body []byte) error {
+func (r *RabbitMQ) Publish(ctx context.Context, exchange string, body []byte) error {
 	publishing := amqp.Publishing{
 		ContentType:  "application/json",
 		DeliveryMode: amqp.Persistent,
@@ -52,13 +42,13 @@ func (r *RabbitMQ) Publish(ctx context.Context, exchange, routingKey string, bod
 
 	err := r.channel.PublishWithContext(ctx,
 		exchange,
-		routingKey,
+		"",
 		false,
 		false,
 		publishing,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to publish a message: %w", err)
+		return err
 	}
 	return nil
 }
@@ -74,7 +64,7 @@ func (r *RabbitMQ) Subscribe(ctx context.Context, exchange, queueName, consumerT
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to declare an exchange: %w", err)
+		return err
 	}
 
 	q, err := r.channel.QueueDeclare(
@@ -86,7 +76,7 @@ func (r *RabbitMQ) Subscribe(ctx context.Context, exchange, queueName, consumerT
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to declare a queue: %w", err)
+		return err
 	}
 
 	err = r.channel.QueueBind(
@@ -97,7 +87,7 @@ func (r *RabbitMQ) Subscribe(ctx context.Context, exchange, queueName, consumerT
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to bind a queue: %w", err)
+		return err
 	}
 
 	msgs, err := r.channel.Consume(
@@ -110,7 +100,7 @@ func (r *RabbitMQ) Subscribe(ctx context.Context, exchange, queueName, consumerT
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to register a consumer: %w", err)
+		return err
 	}
 
 	go func() {
@@ -137,5 +127,23 @@ func (r *RabbitMQ) consumeMessages(ctx context.Context, consumerTag string, msgs
 			}
 			go handler(d)
 		}
+	}
+}
+
+func (r *RabbitMQ) Close() {
+	if r.channel != nil {
+		r.channel.Close()
+	}
+	if r.connection != nil {
+		r.connection.Close()
+	}
+	r.logger.Info("RabbitMQ connection closed")
+}
+
+func (r *RabbitMQ) Ping() error {
+	if r.connection.IsClosed() {
+		return fmt.Errorf("RabbitMQ connection is closed")
+	} else {
+		return nil
 	}
 }

@@ -2,6 +2,7 @@ package order
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -9,6 +10,7 @@ import (
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	orderv1 "github.com/sonuudigital/microservices/gen/order/v1"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
+	"github.com/sonuudigital/microservices/order-service/internal/events"
 	"github.com/sonuudigital/microservices/order-service/internal/repository"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -48,7 +50,16 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 		return nil, err
 	}
 
-	//TODO: implement events publishing for order created
+	if err := s.publishOrderCreatedEvent(ctx, gRPCOrder.Id, gRPCOrder.UserId, cart.Products); err != nil {
+		s.logger.Error(
+			"CRITICAL: payment succeeded but failed to publish OrderCreatedEvent",
+			"error", err,
+			"orderId", gRPCOrder.Id,
+			"userId", gRPCOrder.UserId,
+		)
+
+		return nil, status.Errorf(codes.Internal, "order processing failed after payment, please contact support with order ID: %s", gRPCOrder.Id)
+	}
 
 	return gRPCOrder, nil
 }
@@ -165,6 +176,40 @@ func (s *Server) cancelDBOrderByID(ctx context.Context, orderUUID pgtype.UUID) e
 	s.logger.Debug(
 		"Order canceled",
 		"orderId", orderUUID.String(),
+	)
+
+	return nil
+}
+
+func (s *Server) publishOrderCreatedEvent(ctx context.Context, orderID, userID string, products []*cartv1.CartProduct) error {
+	eventProducts := make([]events.OrderItem, len(products))
+	for i, p := range products {
+		eventProducts[i] = events.OrderItem{
+			ProductID: p.ProductId,
+			Quantity:  p.Quantity,
+		}
+	}
+
+	event := events.OrderCreatedEvent{
+		OrderID:  orderID,
+		UserID:   userID,
+		Products: eventProducts,
+	}
+
+	encodedEvent, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	if err := s.rabbitmq.Publish(ctx, "order_exchange", encodedEvent); err != nil {
+		return err
+	}
+
+	s.logger.Debug(
+		"OrderCreatedEvent published",
+		"orderId", orderID,
+		"userId", userID,
+		"productsCount", len(products),
 	)
 
 	return nil
