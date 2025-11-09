@@ -10,8 +10,8 @@ import (
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	orderv1 "github.com/sonuudigital/microservices/gen/order/v1"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
-	"github.com/sonuudigital/microservices/order-service/internal/events"
 	"github.com/sonuudigital/microservices/order-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/events"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -58,7 +58,7 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 			"userId", gRPCOrder.UserId,
 		)
 
-		return nil, status.Errorf(codes.Internal, "order processing failed after payment, please contact support with order ID: %s", gRPCOrder.Id)
+		return nil, status.Errorf(codes.Internal, "failed to publish order created event: Order ID %s", gRPCOrder.Id)
 	}
 
 	return gRPCOrder, nil
@@ -201,7 +201,7 @@ func (s *Server) publishOrderCreatedEvent(ctx context.Context, orderID, userID s
 		return err
 	}
 
-	if err := s.rabbitmq.Publish(ctx, "order_exchange", encodedEvent); err != nil {
+	if err := s.rabbitmq.Publish(ctx, "order_created_exchange", encodedEvent); err != nil {
 		return err
 	}
 

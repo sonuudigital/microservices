@@ -1,12 +1,12 @@
 package events
 
 type OrderCreatedEvent struct {
-	OrderID  string      `json:"order_id"`
-	UserID   string      `json:"user_id"`
+	OrderID  string      `json:"orderId"`
+	UserID   string      `json:"userId"`
 	Products []OrderItem `json:"products"`
 }
 
 type OrderItem struct {
-	ProductID string `json:"product_id"`
+	ProductID string `json:"productId"`
 	Quantity  int32  `json:"quantity"`
 }

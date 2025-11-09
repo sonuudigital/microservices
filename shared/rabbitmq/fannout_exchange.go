@@ -4,18 +4,18 @@ import (
 	"context"
 	"fmt"
 
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/rabbitmq/amqp091-go"
 	"github.com/sonuudigital/microservices/shared/logs"
 )
 
 type RabbitMQ struct {
 	logger     logs.Logger
-	connection *amqp.Connection
-	channel    *amqp.Channel
+	connection *amqp091.Connection
+	channel    *amqp091.Channel
 }
 
 func NewConnection(logger logs.Logger, url string) (*RabbitMQ, error) {
-	conn, err := amqp.Dial(url)
+	conn, err := amqp091.Dial(url)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +25,7 @@ func NewConnection(logger logs.Logger, url string) (*RabbitMQ, error) {
 		return nil, err
 	}
 
-	logger.Info("Connected to RabbitMQ", "url", url)
+	logger.Info("connected to RabbitMQ")
 	return &RabbitMQ{
 		logger:     logger,
 		connection: conn,
@@ -34,9 +34,9 @@ func NewConnection(logger logs.Logger, url string) (*RabbitMQ, error) {
 }
 
 func (r *RabbitMQ) Publish(ctx context.Context, exchange string, body []byte) error {
-	publishing := amqp.Publishing{
+	publishing := amqp091.Publishing{
 		ContentType:  "application/json",
-		DeliveryMode: amqp.Persistent,
+		DeliveryMode: amqp091.Persistent,
 		Body:         body,
 	}
 
@@ -53,7 +53,7 @@ func (r *RabbitMQ) Publish(ctx context.Context, exchange string, body []byte) er
 	return nil
 }
 
-func (r *RabbitMQ) Subscribe(ctx context.Context, exchange, queueName, consumerTag string, handler func(d amqp.Delivery)) error {
+func (r *RabbitMQ) Subscribe(ctx context.Context, exchange, queueName, consumerTag string, handler func(d amqp091.Delivery)) error {
 	err := r.channel.ExchangeDeclare(
 		exchange,
 		"fanout",
@@ -103,27 +103,20 @@ func (r *RabbitMQ) Subscribe(ctx context.Context, exchange, queueName, consumerT
 		return err
 	}
 
-	go func() {
-		shouldReturn := r.consumeMessages(ctx, consumerTag, msgs, handler)
-		if shouldReturn {
-			return
-		}
-	}()
-
 	r.logger.Info("Consumer subscribed", "consumerTag", consumerTag, "queue", q.Name)
-	return nil
+	return r.consumeMessages(ctx, consumerTag, msgs, handler)
 }
 
-func (r *RabbitMQ) consumeMessages(ctx context.Context, consumerTag string, msgs <-chan amqp.Delivery, handler func(d amqp.Delivery)) bool {
+func (r *RabbitMQ) consumeMessages(ctx context.Context, consumerTag string, msgs <-chan amqp091.Delivery, handler func(d amqp091.Delivery)) error {
 	for {
 		select {
 		case <-ctx.Done():
 			r.logger.Info("Context cancelled, stopping consumer", "consumerTag", consumerTag)
-			return true
+			return ctx.Err()
 		case d, ok := <-msgs:
 			if !ok {
-				r.logger.Info("Message channel closed, stopping consumer", "consumerTag", consumerTag)
-				return true
+				r.logger.Error("Message channel closed, stopping consumer", "consumerTag", consumerTag)
+				return fmt.Errorf("rabbitmq channel closed for consumer %s", consumerTag)
 			}
 			go handler(d)
 		}

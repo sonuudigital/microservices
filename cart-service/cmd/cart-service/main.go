@@ -6,21 +6,24 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"github.com/sonuudigital/microservices/cart-service/internal/clients"
+	"github.com/sonuudigital/microservices/cart-service/internal/events"
 	grpc_server "github.com/sonuudigital/microservices/cart-service/internal/grpc"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
-	"github.com/sonuudigital/microservices/shared/web"
+	"github.com/sonuudigital/microservices/shared/rabbitmq"
 	"github.com/sonuudigital/microservices/shared/web/health"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -47,8 +50,32 @@ func main() {
 	}
 	logger.Info("redis connected successfully")
 
-	startGRPCServer(pgDb, redisClient, logger)
+	rabbitmq, err := initializeRabbitMQ(logger)
+	if err != nil {
+		logger.Error("failed to initialize RabbitMQ", "error", err)
+		os.Exit(1)
+	}
+	defer rabbitmq.Close()
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		return startRabbitMQConsumer(gCtx, logger, rabbitmq, repository.New(pgDb))
+	})
+
+	g.Go(func() error {
+		return startGRPCServer(gCtx, pgDb, redisClient, logger)
+	})
+
+	if err := g.Wait(); err != nil {
+		logger.Error("application exited with error", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("application shut down gracefully")
 }
 
 func initializeRedisClient() (*redis.Client, error) {
@@ -72,29 +99,39 @@ func initializeRedisClient() (*redis.Client, error) {
 	return client, nil
 }
 
-func startGRPCServer(pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.Logger) {
+func initializeRabbitMQ(logger logs.Logger) (*rabbitmq.RabbitMQ, error) {
+	rabbitmqURL := os.Getenv("RABBITMQ_URL")
+	if rabbitmqURL == "" {
+		return nil, fmt.Errorf("RABBITMQ_URL is not set")
+	}
+
+	rabbitmq, err := rabbitmq.NewConnection(logger, rabbitmqURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return rabbitmq, nil
+}
+
+func startGRPCServer(ctx context.Context, pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.Logger) error {
 	productServiceGrpcURL := os.Getenv("PRODUCT_SERVICE_GRPC_URL")
 	if productServiceGrpcURL == "" {
-		logger.Error("PRODUCT_SERVICE_GRPC_URL is not set")
-		os.Exit(1)
+		return fmt.Errorf("PRODUCT_SERVICE_GRPC_URL is not set")
 	}
 	productClient, err := clients.NewProductClient(productServiceGrpcURL, logger)
 	if err != nil {
-		logger.Error("failed to create product client", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create product client: %w", err)
 	}
 	logger.Info("product client created successfully", "url", productServiceGrpcURL)
 
 	grpcPort := os.Getenv("CART_SERVICE_GRPC_PORT")
 	if grpcPort == "" {
-		logger.Error("CART_SERVICE_GRPC_PORT is not set")
-		os.Exit(1)
+		return fmt.Errorf("CART_SERVICE_GRPC_PORT is not set")
 	}
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", grpcPort))
 	if err != nil {
-		logger.Error("failed to listen for gRPC", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to listen for gRPC: %w", err)
 	}
 
 	queries := repository.New(pgDb)
@@ -107,14 +144,35 @@ func startGRPCServer(pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.
 		redisErr := redisClient.Ping(ctx).Err()
 
 		if dbErr == nil && redisErr == nil {
-			logger.Info("service is healthy and serving")
 			return nil
 		} else {
-			errors := errors.Join(dbErr, redisErr)
-			logger.Error("service is not healthy", "errors", errors)
-			return errors
+			return errors.Join(dbErr, redisErr)
 		}
 	})
 
-	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
+	go func() {
+		<-ctx.Done()
+		logger.Info("shutting down gRPC server")
+		grpcServer.GracefulStop()
+	}()
+
+	logger.Info("gRPC server listening", "port", grpcPort)
+	if err := grpcServer.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+		return fmt.Errorf("gRPC server failed: %w", err)
+	}
+
+	logger.Info("gRPC server stopped gracefully")
+	return nil
+}
+
+func startRabbitMQConsumer(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, querier repository.Querier) error {
+	orderCreatedConsumer := events.NewOrderCreatedConsumer(logger, rabbitmq, querier)
+	logger.Info("starting OrderCreatedConsumer")
+
+	if err := orderCreatedConsumer.Start(ctx); err != nil {
+		return fmt.Errorf("OrderCreatedConsumer failed: %w", err)
+	}
+
+	logger.Info("OrderCreatedConsumer stopped gracefully")
+	return nil
 }
