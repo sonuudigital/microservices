@@ -39,6 +39,8 @@ func (h *ProductHandler) CreateProductHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	h.logger.Debug("CreateProductHandler called", "name", req.Name, "price", req.Price, "stockQuantity", req.StockQuantity, "categoryId", req.CategoryID)
+
 	grpcReq := &productv1.CreateProductRequest{
 		CategoryId:    req.CategoryID,
 		Name:          req.Name,
@@ -55,6 +57,7 @@ func (h *ProductHandler) CreateProductHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	h.logger.Debug("product created successfully", "productId", res.Id, "name", res.Name, "stockQuantity", res.StockQuantity)
 	web.RespondWithJSON(w, h.logger, http.StatusCreated, res)
 }
 

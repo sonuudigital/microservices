@@ -16,6 +16,8 @@ func (s *GRPCServer) CreateProduct(ctx context.Context, req *productv1.CreatePro
 		return nil, status.FromContextError(err).Err()
 	}
 
+	s.logger.Debug("CreateProduct called", "name", req.Name, "price", req.Price, "stockQuantity", req.StockQuantity, "categoryId", req.CategoryId)
+
 	var categoryUUID pgtype.UUID
 	if err := categoryUUID.Scan(req.CategoryId); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid category ID: %v", err)
@@ -34,10 +36,15 @@ func (s *GRPCServer) CreateProduct(ctx context.Context, req *productv1.CreatePro
 		StockQuantity: req.StockQuantity,
 	}
 
+	s.logger.Debug("Creating product in DB", "params", params)
+
 	product, err := s.queries.CreateProduct(ctx, params)
 	if err != nil {
+		s.logger.Error("failed to create product in DB", "error", err, "params", params)
 		return nil, status.Errorf(codes.Internal, "failed to create product: %v", err)
 	}
+
+	s.logger.Debug("Product created successfully", "productId", product.ID.String(), "name", product.Name, "stockQuantity", product.StockQuantity)
 
 	grpcProduct := toGRPCProduct(product)
 

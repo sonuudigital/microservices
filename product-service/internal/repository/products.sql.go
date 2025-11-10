@@ -21,7 +21,7 @@ INSERT INTO products (
 ) VALUES (
   $1, $2, $3, $4, $5
 )
-RETURNING id, category_id, name, description, price, created_at, stock_quantity, updated_at
+RETURNING id, category_id, name, description, price, stock_quantity, created_at, updated_at
 `
 
 type CreateProductParams struct {
@@ -47,8 +47,8 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		&i.Name,
 		&i.Description,
 		&i.Price,
-		&i.CreatedAt,
 		&i.StockQuantity,
+		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -65,7 +65,7 @@ func (q *Queries) DeleteProduct(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getProduct = `-- name: GetProduct :one
-SELECT id, category_id, name, description, price, created_at, stock_quantity, updated_at FROM products
+SELECT id, category_id, name, description, price, stock_quantity, created_at, updated_at FROM products
 WHERE id = $1
 `
 
@@ -78,15 +78,15 @@ func (q *Queries) GetProduct(ctx context.Context, id pgtype.UUID) (Product, erro
 		&i.Name,
 		&i.Description,
 		&i.Price,
-		&i.CreatedAt,
 		&i.StockQuantity,
+		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getProductsByCategoryID = `-- name: GetProductsByCategoryID :many
-SELECT id, category_id, name, description, price, created_at, stock_quantity, updated_at FROM products
+SELECT id, category_id, name, description, price, stock_quantity, created_at, updated_at FROM products
 WHERE category_id = $1
 ORDER BY id
 `
@@ -106,8 +106,8 @@ func (q *Queries) GetProductsByCategoryID(ctx context.Context, categoryID pgtype
 			&i.Name,
 			&i.Description,
 			&i.Price,
-			&i.CreatedAt,
 			&i.StockQuantity,
+			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -121,7 +121,7 @@ func (q *Queries) GetProductsByCategoryID(ctx context.Context, categoryID pgtype
 }
 
 const getProductsByIDs = `-- name: GetProductsByIDs :many
-SELECT id, category_id, name, description, price, created_at, stock_quantity, updated_at FROM products
+SELECT id, category_id, name, description, price, stock_quantity, created_at, updated_at FROM products
 WHERE id = ANY($1::uuid[])
 `
 
@@ -140,8 +140,8 @@ func (q *Queries) GetProductsByIDs(ctx context.Context, productIds []pgtype.UUID
 			&i.Name,
 			&i.Description,
 			&i.Price,
-			&i.CreatedAt,
 			&i.StockQuantity,
+			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -155,7 +155,7 @@ func (q *Queries) GetProductsByIDs(ctx context.Context, productIds []pgtype.UUID
 }
 
 const listProductsPaginated = `-- name: ListProductsPaginated :many
-SELECT id, category_id, name, description, price, created_at, stock_quantity, updated_at FROM products
+SELECT id, category_id, name, description, price, stock_quantity, created_at, updated_at FROM products
 ORDER BY name
 LIMIT $1
 OFFSET $2
@@ -181,8 +181,8 @@ func (q *Queries) ListProductsPaginated(ctx context.Context, arg ListProductsPag
 			&i.Name,
 			&i.Description,
 			&i.Price,
-			&i.CreatedAt,
 			&i.StockQuantity,
+			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -205,7 +205,7 @@ SET
   stock_quantity = $6,
   updated_at = NOW()
 WHERE id = $1
-RETURNING id, category_id, name, description, price, created_at, stock_quantity, updated_at
+RETURNING id, category_id, name, description, price, stock_quantity, created_at, updated_at
 `
 
 type UpdateProductParams struct {
@@ -233,8 +233,8 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 		&i.Name,
 		&i.Description,
 		&i.Price,
-		&i.CreatedAt,
 		&i.StockQuantity,
+		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -246,10 +246,9 @@ SET
   stock_quantity = products.stock_quantity - p.quantity,
   updated_at = NOW()
 FROM
-  json_to_recordset($1::json) AS p(id uuid, quantity int)
+  json_to_recordset($1::json) AS p("productId" uuid, quantity int)
 WHERE
-  products.id = p.id
-  AND products.stock_quantity >= p.quantity
+  products.id = p."productId"
 `
 
 func (q *Queries) UpdateStockBatch(ctx context.Context, updateParams []byte) (int64, error) {
