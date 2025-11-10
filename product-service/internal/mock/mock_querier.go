@@ -91,7 +91,7 @@ func (m *MockQuerier) DeleteProductCategory(ctx context.Context, id pgtype.UUID)
 	return args.Error(0)
 }
 
-func (m *MockQuerier) UpdateStockBatch(ctx context.Context, updatesJSON []byte) error {
+func (m *MockQuerier) UpdateStockBatch(ctx context.Context, updatesJSON []byte) (int64, error) {
 	args := m.Called(ctx, updatesJSON)
-	return args.Error(0)
+	return args.Get(0).(int64), args.Error(1)
 }

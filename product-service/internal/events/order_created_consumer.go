@@ -3,8 +3,10 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/redis/go-redis/v9"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/events"
 	"github.com/sonuudigital/microservices/shared/logs"
@@ -12,16 +14,18 @@ import (
 )
 
 type OrderCreatedConsumer struct {
-	logger   logs.Logger
-	rabbitmq *rabbitmq.RabbitMQ
-	querier  repository.Querier
+	logger      logs.Logger
+	rabbitmq    *rabbitmq.RabbitMQ
+	redisClient *redis.Client
+	querier     repository.Querier
 }
 
-func NewOrderCreatedConsumer(logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, querier repository.Querier) *OrderCreatedConsumer {
+func NewOrderCreatedConsumer(logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, redisClient *redis.Client, querier repository.Querier) *OrderCreatedConsumer {
 	return &OrderCreatedConsumer{
-		logger:   logger,
-		rabbitmq: rabbitmq,
-		querier:  querier,
+		logger:      logger,
+		rabbitmq:    rabbitmq,
+		redisClient: redisClient,
+		querier:     querier,
 	}
 }
 
@@ -80,6 +84,8 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		return
 	}
 
+	occ.invalidateCacheForUpdatedProducts(ctx, orderProductItems)
+
 	occ.logger.Info(
 		"successfully updated stock for products in order",
 		"orderId", orderCreatedEvent.OrderID,
@@ -87,4 +93,19 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 	)
 
 	d.Ack(false)
+}
+
+func (occ *OrderCreatedConsumer) invalidateCacheForUpdatedProducts(ctx context.Context, products []events.OrderItem) {
+	pipe := occ.redisClient.Pipeline()
+
+	for _, product := range products {
+		cacheKey := fmt.Sprintf("product:%s", product.ProductID)
+		pipe.Del(ctx, cacheKey)
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		occ.logger.Warn("failed to invalidate cache via pipeline", "error", err)
+	} else {
+		occ.logger.Debug("cache invalidated for products", "products", products)
+	}
 }
