@@ -63,21 +63,29 @@ func (s *GRPCServer) deleteCartCache(userID string) error {
 }
 
 func (s *GRPCServer) getOrCreateCartByUserID(ctx context.Context, userUUID pgtype.UUID) (repository.Cart, bool, error) {
+	s.logger.Debug("attempting to get or create cart", "userId", userUUID.String())
+
 	cart, err := s.queries.GetCartByUserID(ctx, userUUID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			s.logger.Debug("cart not found, creating new one", "userId", userUUID.String())
 			newCart, _, createErr := s.createCart(ctx, userUUID)
 			return newCart, true, createErr
 		}
+		s.logger.Error("failed to get cart by user id", "userId", userUUID.String(), "error", err)
 		return repository.Cart{}, false, fmt.Errorf("failed to get cart by user id: %w", err)
 	}
 
+	s.logger.Debug("cart found", "cartId", cart.ID.String(), "userId", userUUID.String(), "createdAt", cart.CreatedAt.Time)
+
 	expired, err := s.cartIsExpired(cart)
 	if err != nil {
+		s.logger.Error("failed to check if cart is expired", "cartId", cart.ID.String(), "error", err)
 		return repository.Cart{}, false, fmt.Errorf("failed to check if cart is expired: %w", err)
 	}
 
 	if expired {
+		s.logger.Warn("cart has expired, deleting and creating new one", "cartId", cart.ID.String(), "userId", userUUID.String())
 		newCart, _, deleteErr := s.deleteExpiredCartAndCreateNewOne(ctx, userUUID)
 		go s.deleteCartCache(userUUID.String())
 		return newCart, true, deleteErr
@@ -105,7 +113,8 @@ func (s *GRPCServer) deleteExpiredCartAndCreateNewOne(ctx context.Context, userU
 func (s *GRPCServer) cartIsExpired(cart repository.Cart) (bool, error) {
 	cartTTLHours := os.Getenv("CART_TTL_HOURS")
 	if cartTTLHours == "" {
-		return false, fmt.Errorf("CART_TTL_HOURS environment variable is not set")
+		s.logger.Warn("CART_TTL_HOURS not set, defaulting to 168 hours")
+		cartTTLHours = "168"
 	}
 
 	ttlHours, err := strconv.Atoi(cartTTLHours)
@@ -113,6 +122,26 @@ func (s *GRPCServer) cartIsExpired(cart repository.Cart) (bool, error) {
 		return false, fmt.Errorf("invalid CART_TTL_HOURS value: %w", err)
 	}
 
+	if ttlHours == 0 {
+		return false, nil
+	}
+
+	if !cart.CreatedAt.Valid {
+		s.logger.Error("cart has invalid created_at timestamp", "cartId", cart.ID.String())
+		return false, fmt.Errorf("cart has invalid created_at timestamp")
+	}
+
 	expirationTime := cart.CreatedAt.Time.Add(time.Duration(ttlHours) * time.Hour)
-	return time.Now().After(expirationTime), nil
+	isExpired := time.Now().After(expirationTime)
+
+	s.logger.Debug(
+		"checking cart expiration",
+		"cartId", cart.ID.String(),
+		"createdAt", cart.CreatedAt.Time,
+		"expirationTime", expirationTime,
+		"isExpired", isExpired,
+		"ttlHours", ttlHours,
+	)
+
+	return isExpired, nil
 }

@@ -38,10 +38,9 @@ SET
   stock_quantity = products.stock_quantity - p.quantity,
   updated_at = NOW()
 FROM
-  json_to_recordset(sqlc.arg(update_params)::json) AS p(id uuid, quantity int)
+  json_to_recordset(sqlc.arg(update_params)::json) AS p("productId" uuid, quantity int)
 WHERE
-  products.id = p.id
-  AND products.stock_quantity >= p.quantity;
+  products.id = p."productId";
 
 -- name: DeleteProduct :exec
 DELETE FROM products

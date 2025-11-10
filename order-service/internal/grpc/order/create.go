@@ -36,7 +36,14 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 		return nil, err
 	}
 
-	gRPCOrder, err := mapRepositoryToGRPC(DBOrder)
+	orderStatus, err := s.querier.GetOrderStatusByName(ctx, "CREATED")
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get CREATED status: %v", err)
+	}
+
+	s.logger.Debug("order status fetched", "id", orderStatus.ID, "name", orderStatus.Name)
+
+	gRPCOrder, err := mapRepositoryToGRPC(DBOrder, orderStatus.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to map order to gRPC: %v", err)
 	}
@@ -74,6 +81,8 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 }
 
 func (s *Server) getCart(ctx context.Context, userID string) (*cartv1.GetCartResponse, error) {
+	s.logger.Debug("fetching cart for user", "userId", userID)
+
 	cart, err := s.clients.CartServiceClient.GetCart(ctx, &cartv1.GetCartRequest{
 		UserId: userID,
 	})
@@ -168,14 +177,14 @@ func (s *Server) processPayment(ctx context.Context, orderID, userID string, amo
 }
 
 func (s *Server) cancelDBOrderByID(ctx context.Context, orderUUID pgtype.UUID) error {
-	canceledStatusUUID, err := s.querier.GetOrderStatusIDByName(ctx, "CANCELLED")
+	orderStatus, err := s.querier.GetOrderStatusByName(ctx, "CANCELLED")
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to get CANCELLED status: %v", err)
 	}
 
 	_, err = s.querier.UpdateOrderStatus(ctx, repository.UpdateOrderStatusParams{
 		ID:     orderUUID,
-		Status: canceledStatusUUID,
+		Status: orderStatus.ID,
 	})
 
 	if err != nil {
@@ -207,10 +216,14 @@ func (s *Server) publishOrderCreatedEvent(ctx context.Context, orderID, userID s
 
 	encodedEvent, err := json.Marshal(event)
 	if err != nil {
+		s.logger.Error("failed to marshal OrderCreatedEvent", "orderId", orderID, "error", err)
 		return err
 	}
 
+	s.logger.Debug("publishing OrderCreatedEvent", "orderId", orderID, "userId", userID, "productsCount", len(products), "event", string(encodedEvent))
+
 	if err := s.rabbitmq.Publish(ctx, "order_created_exchange", encodedEvent); err != nil {
+		s.logger.Error("failed to publish OrderCreatedEvent", "orderId", orderID, "error", err)
 		return err
 	}
 

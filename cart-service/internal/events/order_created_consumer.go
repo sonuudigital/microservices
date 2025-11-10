@@ -4,27 +4,36 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/redis/go-redis/v9"
 	"github.com/sonuudigital/microservices/cart-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/events"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/rabbitmq"
 )
 
+const (
+	redisCartPrefix     = "cart:"
+	redisContextTimeout = time.Second * 3
+)
+
 type OrderCreatedConsumer struct {
-	logger   logs.Logger
-	rabbitmq *rabbitmq.RabbitMQ
-	querier  repository.Querier
+	logger      logs.Logger
+	rabbitmq    *rabbitmq.RabbitMQ
+	querier     repository.Querier
+	redisClient *redis.Client
 }
 
-func NewOrderCreatedConsumer(logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, querier repository.Querier) *OrderCreatedConsumer {
+func NewOrderCreatedConsumer(logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, querier repository.Querier, redisClient *redis.Client) *OrderCreatedConsumer {
 	return &OrderCreatedConsumer{
-		logger:   logger,
-		rabbitmq: rabbitmq,
-		querier:  querier,
+		logger:      logger,
+		rabbitmq:    rabbitmq,
+		querier:     querier,
+		redisClient: redisClient,
 	}
 }
 
@@ -74,6 +83,20 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		return
 	}
 
-	occ.logger.Info("cleared cart after order creation", "userId", orderCreatedEvent.UserID, "cartId", userCart.ID.String)
+	go occ.deleteCartCache(orderCreatedEvent.UserID)
+
+	occ.logger.Info("cleared cart after order creation", "userId", orderCreatedEvent.UserID, "cartId", userCart.ID.String())
 	d.Ack(false)
+}
+
+func (occ *OrderCreatedConsumer) deleteCartCache(userID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), redisContextTimeout)
+	defer cancel()
+
+	cacheKey := redisCartPrefix + userID
+	if err := occ.redisClient.Del(ctx, cacheKey).Err(); err != nil {
+		occ.logger.Error("failed to delete cart cache", "userID", userID, "error", err)
+	} else {
+		occ.logger.Debug("cart cache invalidated", "userID", userID)
+	}
 }

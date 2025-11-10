@@ -9,7 +9,7 @@ SET status = $2
 WHERE id = $1
 RETURNING *;
 
--- name: GetOrderStatusIDByName :one
-SELECT id
+-- name: GetOrderStatusByName :one
+SELECT id, name
 FROM order_statuses
 WHERE name = $1;

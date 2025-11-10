@@ -67,6 +67,8 @@ func (h *CartHandler) AddProductToCartHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	h.logger.Debug("adding product to cart", "userId", claims.Subject, "productId", req.ProductID, "quantity", req.Quantity)
+
 	grpcReq := &cartv1.AddProductToCartRequest{
 		UserId:    claims.Subject,
 		ProductId: req.ProductID,
@@ -76,11 +78,12 @@ func (h *CartHandler) AddProductToCartHandler(w http.ResponseWriter, r *http.Req
 	res, err := h.cartClient.AddProductToCart(r.Context(), grpcReq)
 	if err != nil {
 		st, _ := status.FromError(err)
-		h.logger.Error("failed to add product to cart via grpc", "error", st.Message())
+		h.logger.Error("failed to add product to cart via grpc", "userId", claims.Subject, "productId", req.ProductID, "error", st.Message(), "code", st.Code())
 		web.RespondWithGRPCError(w, r, st, h.logger)
 		return
 	}
 
+	h.logger.Debug("product added to cart successfully", "userId", claims.Subject, "productId", req.ProductID)
 	web.RespondWithJSON(w, h.logger, http.StatusOK, res)
 }
 

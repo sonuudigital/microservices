@@ -64,7 +64,7 @@ func main() {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return startRabbitMQConsumer(gCtx, logger, rabbitmq, repository.New(pgDb))
+		return startRabbitMQConsumer(gCtx, logger, rabbitmq, repository.New(pgDb), redisClient)
 	})
 
 	g.Go(func() error {
@@ -154,8 +154,8 @@ func startGRPCServer(ctx context.Context, pgDb *pgxpool.Pool, redisClient *redis
 	return web.StartGRPCServerAndWaitForShutdown(ctx, grpcServer, lis, logger)
 }
 
-func startRabbitMQConsumer(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, querier repository.Querier) error {
-	orderCreatedConsumer := events.NewOrderCreatedConsumer(logger, rabbitmq, querier)
+func startRabbitMQConsumer(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, querier repository.Querier, redisClient *redis.Client) error {
+	orderCreatedConsumer := events.NewOrderCreatedConsumer(logger, rabbitmq, querier, redisClient)
 	logger.Info("starting OrderCreatedConsumer")
 
 	if err := orderCreatedConsumer.Start(ctx); err != nil {

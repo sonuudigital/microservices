@@ -49,12 +49,16 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 	)
 
 	orderProductItems := make([]events.OrderItem, len(orderCreatedEvent.Products))
+	productIDs := make([]string, len(orderCreatedEvent.Products))
 	for i, p := range orderCreatedEvent.Products {
 		orderProductItems[i] = events.OrderItem{
 			ProductID: p.ProductID,
 			Quantity:  p.Quantity,
 		}
+		productIDs[i] = p.ProductID
 	}
+
+	occ.logger.Debug("attempting to update stock for products", "products", orderProductItems, "productIDs", productIDs)
 
 	encodedOrderProductItems, err := json.Marshal(orderProductItems)
 	if err != nil {
@@ -63,21 +67,38 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		return
 	}
 
+	occ.logger.Debug("encoded order product items", "json", string(encodedOrderProductItems))
+
 	rowsAffected, err := occ.querier.UpdateStockBatch(ctx, encodedOrderProductItems)
 	if err != nil {
-		occ.logger.Error("failed to update stock batch", "error", err)
+		occ.logger.Error("failed to update stock batch", "error", err, "json", string(encodedOrderProductItems))
 		d.Nack(false, true)
+		return
+	}
+
+	occ.logger.Debug("stock update completed", "rowsAffected", rowsAffected, "expectedRows", len(orderProductItems))
+
+	if rowsAffected == 0 {
+		occ.logger.Error(
+			"no products were updated - products might not exist or have insufficient stock",
+			"orderId", orderCreatedEvent.OrderID,
+			"productIDs", productIDs,
+			"products", orderProductItems,
+		)
+		d.Nack(false, false)
 		return
 	}
 
 	expectedRows := int64(len(orderProductItems))
 	if rowsAffected != expectedRows {
 		occ.logger.Error(
-			"stock update affected unexpected number of rows",
+			"stock update affected unexpected number of rows - some products might not exist or have insufficient stock",
 			"expected", expectedRows,
 			"actual", rowsAffected,
 			"orderId", orderCreatedEvent.OrderID,
+			"productIDs", productIDs,
 			"products", orderProductItems,
+			"json", string(encodedOrderProductItems),
 		)
 		//TODO: implement a compensation action to revert stock changes and cancel order
 		d.Nack(false, false)
