@@ -69,5 +69,5 @@ func startGRPCServer(logger logs.Logger, pgDb *pgxpool.Pool) {
 		}
 	})
 
-	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
+	web.StartGRPCServerAndWaitForShutdown(context.Background(), grpcServer, lis, logger)
 }

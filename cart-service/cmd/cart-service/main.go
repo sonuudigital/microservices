@@ -21,6 +21,7 @@ import (
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/rabbitmq"
+	"github.com/sonuudigital/microservices/shared/web"
 	"github.com/sonuudigital/microservices/shared/web/health"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
@@ -150,19 +151,7 @@ func startGRPCServer(ctx context.Context, pgDb *pgxpool.Pool, redisClient *redis
 		}
 	})
 
-	go func() {
-		<-ctx.Done()
-		logger.Info("shutting down gRPC server")
-		grpcServer.GracefulStop()
-	}()
-
-	logger.Info("gRPC server listening", "port", grpcPort)
-	if err := grpcServer.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-		return fmt.Errorf("gRPC server failed: %w", err)
-	}
-
-	logger.Info("gRPC server stopped gracefully")
-	return nil
+	return web.StartGRPCServerAndWaitForShutdown(ctx, grpcServer, lis, logger)
 }
 
 func startRabbitMQConsumer(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, querier repository.Querier) error {

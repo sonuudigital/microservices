@@ -58,6 +58,15 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 			"userId", gRPCOrder.UserId,
 		)
 
+		if cancelErr := s.cancelDBOrderByID(ctx, DBOrder.ID); cancelErr != nil {
+			s.logger.Error(
+				"CRITICAL: failed to cancel order after failed event publish",
+				"error", cancelErr,
+				"orderId", gRPCOrder.Id,
+				"userId", gRPCOrder.UserId,
+			)
+		}
+
 		return nil, status.Errorf(codes.Internal, "failed to publish order created event: Order ID %s", gRPCOrder.Id)
 	}
 
