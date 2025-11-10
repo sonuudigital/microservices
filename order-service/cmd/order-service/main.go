@@ -116,7 +116,7 @@ func startGRPCServer(logger logs.Logger, pgDb *pgxpool.Pool, grpcClients *client
 		pgDbErr := pgDb.Ping(ctx)
 
 		if rbmqErr == nil && pgDbErr == nil {
-			logger.Info("service is healthy")
+			logger.Info("service is healthy and serving")
 			return nil
 		} else {
 			logger.Error("service is not healthy", "rabbitmqError", rbmqErr, "postgresError", pgDbErr)
@@ -125,5 +125,5 @@ func startGRPCServer(logger logs.Logger, pgDb *pgxpool.Pool, grpcClients *client
 		}
 	})
 
-	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
+	web.StartGRPCServerAndWaitForShutdown(context.Background(), grpcServer, lis, logger)
 }

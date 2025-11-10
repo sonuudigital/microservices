@@ -104,5 +104,5 @@ func startGRPCServer(pgDb *pgxpool.Pool, redisClient *redis.Client, logger logs.
 		}
 	})
 
-	web.StartGRPCServerAndWaitForShutdown(grpcServer, lis, logger)
+	web.StartGRPCServerAndWaitForShutdown(context.Background(), grpcServer, lis, logger)
 }
