@@ -41,7 +41,7 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		"received OrderCreatedEvent",
 		"orderId", orderCreatedEvent.OrderID,
 		"userId", orderCreatedEvent.UserID,
-		"products", orderCreatedEvent.Products,
+		"productsCount", len(orderCreatedEvent.Products),
 	)
 
 	orderProductItems := make([]events.OrderItem, len(orderCreatedEvent.Products))
@@ -59,17 +59,31 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		return
 	}
 
-	if err := occ.querier.UpdateStockBatch(ctx, encodedOrderProductItems); err != nil {
-		occ.logger.Error("failed to update stock for products", "error", err)
+	rowsAffected, err := occ.querier.UpdateStockBatch(ctx, encodedOrderProductItems)
+	if err != nil {
+		occ.logger.Error("failed to update stock batch", "error", err)
 		d.Nack(false, true)
+		return
+	}
+
+	expectedRows := int64(len(orderProductItems))
+	if rowsAffected != expectedRows {
+		occ.logger.Error(
+			"stock update affected unexpected number of rows",
+			"expected", expectedRows,
+			"actual", rowsAffected,
+			"orderId", orderCreatedEvent.OrderID,
+			"products", orderProductItems,
+		)
+		//TODO: implement a compensation action to revert stock changes and cancel order
+		d.Nack(false, false)
 		return
 	}
 
 	occ.logger.Info(
 		"successfully updated stock for products in order",
 		"orderId", orderCreatedEvent.OrderID,
-		"userId", orderCreatedEvent.UserID,
-		"products", orderCreatedEvent.Products,
+		"productsCount", len(orderProductItems),
 	)
 
 	d.Ack(false)
