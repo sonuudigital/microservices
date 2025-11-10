@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
+	orderv1 "github.com/sonuudigital/microservices/gen/order/v1"
 	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
@@ -24,6 +25,7 @@ type ClientURL struct {
 	UserServiceURL    string
 	ProductServiceURL string
 	CartServiceURL    string
+	OrderServiceURL   string
 }
 
 type GRPCClient struct {
@@ -31,6 +33,7 @@ type GRPCClient struct {
 	productv1.ProductServiceClient
 	product_categoriesv1.ProductCategoriesServiceClient
 	cartv1.CartServiceClient
+	orderv1.OrderServiceClient
 }
 
 func NewGRPCClient(urls ClientURL) (*GRPCClient, error) {
@@ -54,10 +57,16 @@ func NewGRPCClient(urls ClientURL) (*GRPCClient, error) {
 		return nil, &GRPCClientError{ServiceName: "Cart Service", Err: err}
 	}
 
+	orderServiceClient, err := grpc.NewClient(urls.OrderServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, &GRPCClientError{ServiceName: "Order Service", Err: err}
+	}
+
 	return &GRPCClient{
 		UserServiceClient:              userv1.NewUserServiceClient(userServiceClient),
 		ProductServiceClient:           productv1.NewProductServiceClient(productServiceClient),
 		ProductCategoriesServiceClient: product_categoriesv1.NewProductCategoriesServiceClient(productCategoriesServiceClient),
 		CartServiceClient:              cartv1.NewCartServiceClient(cartServiceClient),
+		OrderServiceClient:             orderv1.NewOrderServiceClient(orderServiceClient),
 	}, nil
 }

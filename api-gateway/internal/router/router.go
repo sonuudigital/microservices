@@ -26,11 +26,13 @@ func New(logger logs.Logger, jwtManager *auth.JWTManager, rateLimiter *middlewar
 	productHandler := handlers.NewProductHandler(logger, clients.ProductServiceClient)
 	productCategoriesHandler := handlers.NewProductCategoriesHandler(logger, clients.ProductCategoriesServiceClient)
 	cartHandler := handlers.NewCartHandler(logger, clients.CartServiceClient)
+	orderHandler := handlers.NewOrderHandler(logger, clients.OrderServiceClient)
 
 	configAuthAndUserRoutes(mux, authHandler, userHandler, authMw)
 	configProductRoutes(mux, productHandler, authMw)
 	configProductCategoriesRoutes(mux, productCategoriesHandler, authMw)
 	configCartRoutes(mux, cartHandler, authMw)
+	configOrderRoutes(mux, orderHandler, authMw)
 
 	var handler http.Handler = mux
 	handler = rateLimiter.Middleware(handler)
@@ -66,4 +68,8 @@ func configCartRoutes(mux *http.ServeMux, cartHandler *handlers.CartHandler, aut
 	mux.Handle("DELETE /api/carts/products/{productId}", authMiddleware(http.HandlerFunc(cartHandler.RemoveProductFromCartHandler)))
 	mux.Handle("DELETE /api/carts/products", authMiddleware(http.HandlerFunc(cartHandler.ClearCartHandler)))
 	mux.Handle("DELETE /api/carts", authMiddleware(http.HandlerFunc(cartHandler.DeleteCartHandler)))
+}
+
+func configOrderRoutes(mux *http.ServeMux, orderHandler *handlers.OrderHandler, authMiddleware authMiddleware) {
+	mux.Handle("POST /api/orders", authMiddleware(http.HandlerFunc(orderHandler.CreateOrderHandler)))
 }

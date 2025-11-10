@@ -40,6 +40,7 @@ func main() {
 		UserServiceURL:    os.Getenv("USER_SERVICE_GRPC_URL"),
 		ProductServiceURL: os.Getenv("PRODUCT_SERVICE_GRPC_URL"),
 		CartServiceURL:    os.Getenv("CART_SERVICE_GRPC_URL"),
+		OrderServiceURL:   os.Getenv("ORDER_SERVICE_GRPC_URL"),
 	})
 	if err != nil {
 		logger.Error("failed to create gRPC clients", "error", err.Error())
@@ -68,6 +69,7 @@ func verifyEnvironmentServiceURLs(logger logs.Logger) bool {
 		"USER_SERVICE_GRPC_URL",
 		"PRODUCT_SERVICE_GRPC_URL",
 		"CART_SERVICE_GRPC_URL",
+		"ORDER_SERVICE_GRPC_URL",
 		"REDIS_URL",
 	}
 

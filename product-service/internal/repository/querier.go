@@ -22,7 +22,7 @@ type Querier interface {
 	ListProductsPaginated(ctx context.Context, arg ListProductsPaginatedParams) ([]Product, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 	UpdateProductCategory(ctx context.Context, arg UpdateProductCategoryParams) error
-	UpdateStockBatch(ctx context.Context, updateParams []byte) error
+	UpdateStockBatch(ctx context.Context, updateParams []byte) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)
