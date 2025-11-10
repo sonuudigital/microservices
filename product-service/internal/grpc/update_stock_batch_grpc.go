@@ -24,7 +24,7 @@ func (s *GRPCServer) UpdateStockBatch(ctx context.Context, req *productv1.Update
 		return nil, status.Errorf(codes.Internal, "failed to marshal update stock batch request: %v", err)
 	}
 
-	if err := s.queries.UpdateStockBatch(ctx, jsonReq); err != nil {
+	if _, err := s.queries.UpdateStockBatch(ctx, jsonReq); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update stock batch: %v", err)
 	}
 
