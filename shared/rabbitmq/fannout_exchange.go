@@ -86,11 +86,16 @@ func (r *RabbitMQ) Publish(ctx context.Context, exchange string, body []byte) er
 	const backoff = 100 * time.Millisecond
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		if err := r.ensureExchange(ctx, exchange, attempt, maxRetries, backoff); err != nil {
+		err := r.ensureExchange(ctx, exchange, attempt, maxRetries, backoff)
+		if err != nil {
+			if r.isConnectionError(err) && attempt < maxRetries {
+				r.logger.Warn("publish: could not ensure exchange, retrying...", "attempt", attempt, "error", err)
+				continue
+			}
 			return err
 		}
 
-		err := r.publishMessage(ctx, exchange, body, attempt, maxRetries, backoff)
+		err = r.publishMessage(ctx, exchange, body, attempt, maxRetries, backoff)
 		if err == nil {
 			return nil
 		}
@@ -167,7 +172,7 @@ func (r *RabbitMQ) handleConnectionError(ctx context.Context, attempt int, backo
 	}
 
 	time.Sleep(backoff * time.Duration(attempt))
-	return nil
+	return err
 }
 
 func (r *RabbitMQ) isConnectionError(err error) bool {

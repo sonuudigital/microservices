@@ -21,3 +21,13 @@ type OrderStatus struct {
 	Name      string             `json:"name"`
 	CreatedAt pgtype.Timestamptz `json:"createdAt"`
 }
+
+type OutboxEvent struct {
+	ID          pgtype.UUID        `json:"id"`
+	AggregateID pgtype.UUID        `json:"aggregateId"`
+	EventName   string             `json:"eventName"`
+	Payload     []byte             `json:"payload"`
+	Status      interface{}        `json:"status"`
+	CreatedAt   pgtype.Timestamptz `json:"createdAt"`
+	PublishedAt pgtype.Timestamptz `json:"publishedAt"`
+}
