@@ -2,16 +2,10 @@ package order
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	orderv1 "github.com/sonuudigital/microservices/gen/order/v1"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
-	"github.com/sonuudigital/microservices/order-service/internal/repository"
-	"github.com/sonuudigital/microservices/shared/events"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -31,51 +25,27 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 		return nil, err
 	}
 
-	DBOrder, err := s.createDBOrderByUserID(ctx, cart)
+	_, err = s.processPayment(ctx, "", req.UserId, cart.TotalPrice)
 	if err != nil {
 		return nil, err
 	}
 
-	orderStatus, err := s.querier.GetOrderStatusByName(ctx, "CREATED")
+	gRPCOrder, err := s.repository.CreateOrder(ctx, req.UserId, cart.TotalPrice, cart.Products)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get CREATED status: %v", err)
-	}
-
-	s.logger.Debug("order status fetched", "id", orderStatus.ID, "name", orderStatus.Name)
-
-	gRPCOrder, err := mapRepositoryToGRPC(DBOrder, orderStatus.Name)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to map order to gRPC: %v", err)
-	}
-
-	_, err = s.processPayment(ctx, gRPCOrder.Id, req.UserId, gRPCOrder.TotalAmount)
-	if err != nil {
-		cancelErr := s.cancelDBOrderByID(ctx, DBOrder.ID)
-		if cancelErr != nil {
-			return nil, errors.Join(err, cancelErr)
-		}
-		return nil, err
-	}
-
-	if err := s.publishOrderCreatedEvent(ctx, gRPCOrder.Id, gRPCOrder.UserId, cart.Products); err != nil {
 		s.logger.Error(
-			"CRITICAL: payment succeeded but failed to publish OrderCreatedEvent",
+			"CRITICAL: payment succeeded but failed to create order and outbox event",
 			"error", err,
-			"orderId", gRPCOrder.Id,
-			"userId", gRPCOrder.UserId,
+			"userId", req.UserId,
+			"cartId", cart.Id,
 		)
-
-		if cancelErr := s.cancelDBOrderByID(ctx, DBOrder.ID); cancelErr != nil {
-			s.logger.Error(
-				"CRITICAL: failed to cancel order after failed event publish",
-				"error", cancelErr,
-				"orderId", gRPCOrder.Id,
-				"userId", gRPCOrder.UserId,
-			)
-		}
-
-		return nil, status.Errorf(codes.Internal, "failed to publish order created event: Order ID %s", gRPCOrder.Id)
+		return nil, status.Errorf(codes.Internal, "failed to finalize order after successful payment")
 	}
+
+	s.logger.Debug(
+		"Order created and outbox event recorded",
+		"orderId", gRPCOrder.Id,
+		"userId", gRPCOrder.UserId,
+	)
 
 	return gRPCOrder, nil
 }
@@ -117,35 +87,6 @@ func (s *Server) getCart(ctx context.Context, userID string) (*cartv1.GetCartRes
 	return cart, nil
 }
 
-func (s *Server) createDBOrderByUserID(ctx context.Context, cart *cartv1.GetCartResponse) (*repository.Order, error) {
-	var userUUID pgtype.UUID
-	if err := userUUID.Scan(cart.UserId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user ID: %v", err)
-	}
-
-	var totalAmount pgtype.Numeric
-	if err := totalAmount.Scan(fmt.Sprintf("%.2f", cart.TotalPrice)); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to parse total amount: %v", err)
-	}
-
-	order, err := s.querier.CreateOrder(ctx, repository.CreateOrderParams{
-		UserID:      userUUID,
-		TotalAmount: totalAmount,
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create order: %v", err)
-	}
-
-	s.logger.Debug(
-		"Order created",
-		"orderId", order.ID.String(),
-		"userId", order.UserID.String(),
-		"status", order.Status.String(),
-	)
-
-	return &order, nil
-}
-
 func (s *Server) processPayment(ctx context.Context, orderID, userID string, amount float64) (*paymentv1.Payment, error) {
 	payment, err := s.clients.PaymentServiceClient.ProcessPayment(ctx, &paymentv1.ProcessPaymentRequest{
 		OrderId: orderID,
@@ -174,65 +115,4 @@ func (s *Server) processPayment(ctx context.Context, orderID, userID string, amo
 	)
 
 	return payment, nil
-}
-
-func (s *Server) cancelDBOrderByID(ctx context.Context, orderUUID pgtype.UUID) error {
-	orderStatus, err := s.querier.GetOrderStatusByName(ctx, "CANCELLED")
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to get CANCELLED status: %v", err)
-	}
-
-	_, err = s.querier.UpdateOrderStatus(ctx, repository.UpdateOrderStatusParams{
-		ID:     orderUUID,
-		Status: orderStatus.ID,
-	})
-
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to cancel order %s: %v", orderUUID.String(), err)
-	}
-
-	s.logger.Debug(
-		"Order canceled",
-		"orderId", orderUUID.String(),
-	)
-
-	return nil
-}
-
-func (s *Server) publishOrderCreatedEvent(ctx context.Context, orderID, userID string, products []*cartv1.CartProduct) error {
-	eventProducts := make([]events.OrderItem, len(products))
-	for i, p := range products {
-		eventProducts[i] = events.OrderItem{
-			ProductID: p.ProductId,
-			Quantity:  p.Quantity,
-		}
-	}
-
-	event := events.OrderCreatedEvent{
-		OrderID:  orderID,
-		UserID:   userID,
-		Products: eventProducts,
-	}
-
-	encodedEvent, err := json.Marshal(event)
-	if err != nil {
-		s.logger.Error("failed to marshal OrderCreatedEvent", "orderId", orderID, "error", err)
-		return err
-	}
-
-	s.logger.Debug("publishing OrderCreatedEvent", "orderId", orderID, "userId", userID, "productsCount", len(products), "event", string(encodedEvent))
-
-	if err := s.rabbitmq.Publish(ctx, "order_created_exchange", encodedEvent); err != nil {
-		s.logger.Error("failed to publish OrderCreatedEvent", "orderId", orderID, "error", err)
-		return err
-	}
-
-	s.logger.Debug(
-		"OrderCreatedEvent published",
-		"orderId", orderID,
-		"userId", userID,
-		"productsCount", len(products),
-	)
-
-	return nil
 }

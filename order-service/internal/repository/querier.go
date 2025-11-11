@@ -10,8 +10,11 @@ import (
 
 type Querier interface {
 	CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error)
+	CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) error
 	GetOrderStatusByName(ctx context.Context, name string) (GetOrderStatusByNameRow, error)
+	GetUnpublishedOutboxEvents(ctx context.Context, limit int32) ([]OutboxEvent, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
+	UpdateOutboxEventStatus(ctx context.Context, arg UpdateOutboxEventStatusParams) error
 }
 
 var _ Querier = (*Queries)(nil)

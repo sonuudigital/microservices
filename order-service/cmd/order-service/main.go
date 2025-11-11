@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -52,7 +51,7 @@ func main() {
 	}
 	defer rabbitmq.Close()
 
-	startGRPCServer(logger, pgDb, grpcClients, rabbitmq)
+	startGRPCServer(logger, pgDb, grpcClients)
 }
 
 func initializegRPCClients(logger logs.Logger) (*clients.Clients, error) {
@@ -91,7 +90,7 @@ func initializeRabbitMQ(logger logs.Logger) (*rabbitmq.RabbitMQ, error) {
 	return rabbitmq, nil
 }
 
-func startGRPCServer(logger logs.Logger, pgDb *pgxpool.Pool, grpcClients *clients.Clients, rabbitmq *rabbitmq.RabbitMQ) {
+func startGRPCServer(logger logs.Logger, pgDb *pgxpool.Pool, grpcClients *clients.Clients) {
 	gRPCPort := os.Getenv("ORDER_SERVICE_GRPC_PORT")
 	if gRPCPort == "" {
 		logger.Error("ORDER_SERVICE_GRPC_PORT is not set")
@@ -105,23 +104,19 @@ func startGRPCServer(logger logs.Logger, pgDb *pgxpool.Pool, grpcClients *client
 	}
 
 	grpcServer := grpc.NewServer()
-	orderGrpcServer := order.New(logger, repository.New(pgDb), grpcClients, rabbitmq)
+	orderGrpcServer := order.New(logger, repository.NewPostgreSQLOrderRepository(pgDb), grpcClients)
 	orderv1.RegisterOrderServiceServer(grpcServer, orderGrpcServer)
 
 	health.StartGRPCHealthCheckService(grpcServer, "order-service", func(ctx context.Context) error {
 		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 		defer cancel()
 
-		rbmqErr := rabbitmq.Ping()
-		pgDbErr := pgDb.Ping(ctx)
-
-		if rbmqErr == nil && pgDbErr == nil {
+		if err := pgDb.Ping(ctx); err != nil {
+			logger.Info("service is not healthy", "error", err)
+			return err
+		} else {
 			logger.Info("service is healthy and serving")
 			return nil
-		} else {
-			logger.Error("service is not healthy", "rabbitmqError", rbmqErr, "postgresError", pgDbErr)
-			errs := errors.Join(rbmqErr, pgDbErr)
-			return errs
 		}
 	})
 
