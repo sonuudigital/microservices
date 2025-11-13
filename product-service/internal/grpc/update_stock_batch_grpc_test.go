@@ -34,7 +34,7 @@ func TestUpdateStockBatch(t *testing.T) {
 		}
 
 		mockQuerier.On("UpdateStockBatch", mock.Anything, mock.AnythingOfType(uint8ArrayType)).
-			Return(nil).Once()
+			Return(int64(2), nil).Once()
 
 		redisMock.MatchExpectationsInOrder(false)
 		redisMock.ExpectDel(productCachePrefix + uuidTest).SetVal(1)
@@ -59,7 +59,7 @@ func TestUpdateStockBatch(t *testing.T) {
 		}
 
 		mockQuerier.On("UpdateStockBatch", mock.Anything, mock.AnythingOfType(uint8ArrayType)).
-			Return(nil).Once()
+			Return(int64(1), nil).Once()
 
 		redisMock.MatchExpectationsInOrder(false)
 		redisMock.ExpectDel(productCachePrefix + uuidTest).SetVal(1)
@@ -123,7 +123,7 @@ func TestUpdateStockBatch(t *testing.T) {
 		}
 
 		mockQuerier.On("UpdateStockBatch", mock.Anything, mock.AnythingOfType(uint8ArrayType)).
-			Return(errors.New("database error")).Once()
+			Return(int64(0), errors.New("database error")).Once()
 
 		res, err := server.UpdateStockBatch(context.Background(), req)
 
@@ -178,7 +178,7 @@ func TestUpdateStockBatch(t *testing.T) {
 		}
 
 		mockQuerier.On("UpdateStockBatch", mock.Anything, mock.AnythingOfType(uint8ArrayType)).
-			Return(nil).Once()
+			Return(int64(10), nil).Once()
 
 		redisMock.MatchExpectationsInOrder(false)
 		for range 10 {
