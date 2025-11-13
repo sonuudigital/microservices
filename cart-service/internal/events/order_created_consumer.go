@@ -17,35 +17,47 @@ import (
 )
 
 const (
+	exchangeName        = "order_created_exchange"
+	queueName           = "cart_queue"
+	consumerName        = "cart_order_created_consumer"
 	redisCartPrefix     = "cart:"
 	redisContextTimeout = time.Second * 3
 )
 
+type OrderCreatedConsumerRepository interface {
+	GetProcessedEventByAggregateIDAndEventName(ctx context.Context, arg repository.GetProcessedEventByAggregateIDAndEventNameParams) (repository.ProcessedEvent, error)
+	DeleteCartAndCreateProcessedEvent(ctx context.Context, event *events.OrderCreatedEvent, eventName string) error
+}
+
 type OrderCreatedConsumer struct {
 	logger      logs.Logger
 	rabbitmq    *rabbitmq.RabbitMQ
-	querier     repository.Querier
+	repo        OrderCreatedConsumerRepository
 	redisClient *redis.Client
 }
 
-func NewOrderCreatedConsumer(logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, querier repository.Querier, redisClient *redis.Client) *OrderCreatedConsumer {
+func NewOrderCreatedConsumer(logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, repo OrderCreatedConsumerRepository, redisClient *redis.Client) *OrderCreatedConsumer {
 	return &OrderCreatedConsumer{
 		logger:      logger,
 		rabbitmq:    rabbitmq,
-		querier:     querier,
+		repo:        repo,
 		redisClient: redisClient,
 	}
 }
 
 func (occ *OrderCreatedConsumer) Start(ctx context.Context) error {
-	return occ.rabbitmq.Subscribe(ctx, "order_created_exchange", "cart_queue", "cart_order_created_consumer", occ.handleOrderCreatedEvent)
+	return occ.rabbitmq.Subscribe(ctx, exchangeName, queueName, consumerName, occ.handleOrderCreatedEvent)
 }
 
 func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d amqp091.Delivery) {
-	var orderCreatedEvent events.OrderCreatedEvent
-	if err := json.Unmarshal(d.Body, &orderCreatedEvent); err != nil {
+	orderCreatedEvent, err := occ.unmarshalEvent(d.Body)
+	if err != nil {
 		occ.logger.Error("failed to unmarshal OrderCreatedEvent", "error", err)
 		d.Nack(false, false)
+		return
+	}
+
+	if occ.shouldSkipProcessing(ctx, orderCreatedEvent.OrderID, d) {
 		return
 	}
 
@@ -53,40 +65,62 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		"received OrderCreatedEvent",
 		"orderId", orderCreatedEvent.OrderID,
 		"userId", orderCreatedEvent.UserID,
-		"products", orderCreatedEvent.Products,
 	)
 
-	var userUUID pgtype.UUID
-	if err := userUUID.Scan(orderCreatedEvent.UserID); err != nil {
-		occ.logger.Error("failed to scan user ID", "error", err)
-		d.Nack(false, false)
-		return
-	}
-
-	userCart, err := occ.querier.GetCartByUserID(ctx, userUUID)
+	err = occ.repo.DeleteCartAndCreateProcessedEvent(ctx, orderCreatedEvent, exchangeName)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			occ.logger.Info("no cart found for user, nothing to clear", "userId", orderCreatedEvent.UserID)
-			d.Ack(false)
-			return
-		} else {
-			occ.logger.Error("failed to get cart by user ID", "error", err)
-			d.Nack(false, false)
-			return
-		}
-	}
-
-	err = occ.querier.DeleteCartByUserID(ctx, userUUID)
-	if err != nil {
-		occ.logger.Error("failed to delete cart after order creation", "error", err)
+		occ.logger.Error("failed to delete cart and create processed event", "error", err, "orderId", orderCreatedEvent.OrderID)
 		d.Nack(false, true)
 		return
 	}
 
 	go occ.deleteCartCache(orderCreatedEvent.UserID)
 
-	occ.logger.Info("cleared cart after order creation", "userId", orderCreatedEvent.UserID, "cartId", userCart.ID.String())
+	occ.logger.Info("cleared cart after order creation", "userId", orderCreatedEvent.UserID, "orderId", orderCreatedEvent.OrderID)
 	d.Ack(false)
+}
+
+func (occ *OrderCreatedConsumer) unmarshalEvent(body []byte) (*events.OrderCreatedEvent, error) {
+	var orderCreatedEvent events.OrderCreatedEvent
+	if err := json.Unmarshal(body, &orderCreatedEvent); err != nil {
+		return nil, err
+	}
+	return &orderCreatedEvent, nil
+}
+
+func (occ *OrderCreatedConsumer) shouldSkipProcessing(ctx context.Context, orderID string, d amqp091.Delivery) bool {
+	processed, err := occ.isEventProcessed(ctx, orderID, exchangeName)
+	if err != nil {
+		occ.logger.Error("failed to check if event is already processed", "error", err, "orderId", orderID)
+		d.Nack(false, true)
+		return true
+	}
+	if processed {
+		occ.logger.Info("event already processed, acknowledging without reprocessing", "orderId", orderID)
+		d.Ack(false)
+		return true
+	}
+	return false
+}
+
+func (occ *OrderCreatedConsumer) isEventProcessed(ctx context.Context, aggregateID string, eventName string) (bool, error) {
+	var aggregateUUID pgtype.UUID
+	if err := aggregateUUID.Scan(aggregateID); err != nil {
+		return false, err
+	}
+
+	processedEvent, err := occ.repo.GetProcessedEventByAggregateIDAndEventName(ctx, repository.GetProcessedEventByAggregateIDAndEventNameParams{
+		AggregateID: aggregateUUID,
+		EventName:   eventName,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return processedEvent.ID.Valid, nil
 }
 
 func (occ *OrderCreatedConsumer) deleteCartCache(userID string) {

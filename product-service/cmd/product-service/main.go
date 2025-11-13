@@ -14,7 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
-	"github.com/sonuudigital/microservices/product-service/internal/events"
+	"github.com/sonuudigital/microservices/product-service/internal/events/consumers"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	"github.com/sonuudigital/microservices/product-service/internal/grpc/category"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
@@ -123,8 +123,8 @@ func startGRPCServer(ctx context.Context, pgDb *pgxpool.Pool, redisClient *redis
 	return web.StartGRPCServerAndWaitForShutdown(ctx, grpcServer, lis, logger)
 }
 
-func startRabbitMQConsumer(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, redisClient *redis.Client, repo events.OrderCreatedConsumerRepository) error {
-	orderCreatedConsumer := events.NewOrderCreatedConsumer(logger, rabbitmq, redisClient, repo)
+func startRabbitMQConsumer(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, redisClient *redis.Client, repo consumers.OrderCreatedConsumerRepository) error {
+	orderCreatedConsumer := consumers.NewOrderCreatedConsumer(logger, rabbitmq, redisClient, repo)
 	logger.Info("starting OrderCreatedConsumer")
 
 	if err := orderCreatedConsumer.Start(ctx); err != nil {

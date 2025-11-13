@@ -22,3 +22,10 @@ type CartsProduct struct {
 	Price     pgtype.Numeric     `json:"price"`
 	AddedAt   pgtype.Timestamptz `json:"addedAt"`
 }
+
+type ProcessedEvent struct {
+	ID          pgtype.UUID        `json:"id"`
+	AggregateID pgtype.UUID        `json:"aggregateId"`
+	EventName   string             `json:"eventName"`
+	ProcessedAt pgtype.Timestamptz `json:"processedAt"`
+}
