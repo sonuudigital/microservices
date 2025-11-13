@@ -66,18 +66,13 @@ func (q *Queries) GetUnpublishedOutboxEvents(ctx context.Context, limit int32) (
 const updateOutboxEventStatus = `-- name: UpdateOutboxEventStatus :exec
 UPDATE outbox_events
 SET
-    status = $2,
+    status = 'PUBLISHED',
     published_at = NOW()
 WHERE
     id = $1
 `
 
-type UpdateOutboxEventStatusParams struct {
-	ID     pgtype.UUID `json:"id"`
-	Status interface{} `json:"status"`
-}
-
-func (q *Queries) UpdateOutboxEventStatus(ctx context.Context, arg UpdateOutboxEventStatusParams) error {
-	_, err := q.db.Exec(ctx, updateOutboxEventStatus, arg.ID, arg.Status)
+func (q *Queries) UpdateOutboxEventStatus(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, updateOutboxEventStatus, id)
 	return err
 }

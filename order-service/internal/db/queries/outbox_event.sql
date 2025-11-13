@@ -5,7 +5,7 @@ VALUES ($1, $2, $3);
 -- name: UpdateOutboxEventStatus :exec
 UPDATE outbox_events
 SET
-    status = $2,
+    status = 'PUBLISHED',
     published_at = NOW()
 WHERE
     id = $1;
