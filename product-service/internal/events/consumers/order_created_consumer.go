@@ -1,4 +1,4 @@
-package events
+package consumers
 
 import (
 	"context"

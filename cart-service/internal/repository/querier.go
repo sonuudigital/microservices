@@ -14,9 +14,11 @@ type Querier interface {
 	AddOrUpdateProductInCart(ctx context.Context, arg AddOrUpdateProductInCartParams) (CartsProduct, error)
 	ClearCartProductsByUserID(ctx context.Context, userID pgtype.UUID) error
 	CreateCart(ctx context.Context, userID pgtype.UUID) (Cart, error)
+	CreateProcessedEvent(ctx context.Context, arg CreateProcessedEventParams) error
 	DeleteCartByUserID(ctx context.Context, userID pgtype.UUID) error
 	GetCartByUserID(ctx context.Context, userID pgtype.UUID) (Cart, error)
 	GetCartProductsByCartID(ctx context.Context, cartID pgtype.UUID) ([]GetCartProductsByCartIDRow, error)
+	GetProcessedEventByAggregateIDAndEventName(ctx context.Context, arg GetProcessedEventByAggregateIDAndEventNameParams) (ProcessedEvent, error)
 	RemoveProductFromCart(ctx context.Context, arg RemoveProductFromCartParams) error
 }
 

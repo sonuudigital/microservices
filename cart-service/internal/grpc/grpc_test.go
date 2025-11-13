@@ -55,6 +55,15 @@ func (m *MockQuerier) ClearCartProductsByUserID(ctx context.Context, userID pgty
 	return m.Called(ctx, userID).Error(0)
 }
 
+func (m *MockQuerier) CreateProcessedEvent(ctx context.Context, arg repository.CreateProcessedEventParams) error {
+	return m.Called(ctx, arg).Error(0)
+}
+
+func (m *MockQuerier) GetProcessedEventByAggregateIDAndEventName(ctx context.Context, arg repository.GetProcessedEventByAggregateIDAndEventNameParams) (repository.ProcessedEvent, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(repository.ProcessedEvent), args.Error(1)
+}
+
 type MockProductFetcher struct {
 	mock.Mock
 }
