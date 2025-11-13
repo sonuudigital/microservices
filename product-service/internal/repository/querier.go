@@ -11,10 +11,12 @@ import (
 )
 
 type Querier interface {
+	CreateProcessedEvent(ctx context.Context, arg CreateProcessedEventParams) error
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	CreateProductCategory(ctx context.Context, arg CreateProductCategoryParams) (ProductCategory, error)
 	DeleteProduct(ctx context.Context, id pgtype.UUID) error
 	DeleteProductCategory(ctx context.Context, id pgtype.UUID) error
+	GetProcessedEventByAggregateIDAndEventName(ctx context.Context, arg GetProcessedEventByAggregateIDAndEventNameParams) (ProcessedEvent, error)
 	GetProduct(ctx context.Context, id pgtype.UUID) (Product, error)
 	GetProductCategories(ctx context.Context) ([]ProductCategory, error)
 	GetProductsByCategoryID(ctx context.Context, categoryID pgtype.UUID) ([]Product, error)
