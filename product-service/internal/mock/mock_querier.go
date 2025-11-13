@@ -95,3 +95,16 @@ func (m *MockQuerier) UpdateStockBatch(ctx context.Context, updatesJSON []byte) 
 	args := m.Called(ctx, updatesJSON)
 	return args.Get(0).(int64), args.Error(1)
 }
+
+func (m *MockQuerier) CreateProcessedEvent(ctx context.Context, arg repository.CreateProcessedEventParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) GetProcessedEventByAggregateIDAndEventName(ctx context.Context, arg repository.GetProcessedEventByAggregateIDAndEventNameParams) (repository.ProcessedEvent, error) {
+	args := m.Called(ctx, arg)
+	if p, ok := args.Get(0).(repository.ProcessedEvent); ok {
+		return p, args.Error(1)
+	}
+	return repository.ProcessedEvent{}, args.Error(1)
+}

@@ -8,6 +8,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ProcessedEvent struct {
+	ID          pgtype.UUID        `json:"id"`
+	AggregateID pgtype.UUID        `json:"aggregateId"`
+	EventName   string             `json:"eventName"`
+	ProcessedAt pgtype.Timestamptz `json:"processedAt"`
+}
+
 type Product struct {
 	ID            pgtype.UUID        `json:"id"`
 	CategoryID    pgtype.UUID        `json:"categoryId"`
