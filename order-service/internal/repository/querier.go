@@ -6,6 +6,8 @@ package repository
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -14,7 +16,7 @@ type Querier interface {
 	GetOrderStatusByName(ctx context.Context, name string) (GetOrderStatusByNameRow, error)
 	GetUnpublishedOutboxEvents(ctx context.Context, limit int32) ([]OutboxEvent, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
-	UpdateOutboxEventStatus(ctx context.Context, arg UpdateOutboxEventStatusParams) error
+	UpdateOutboxEventStatus(ctx context.Context, id pgtype.UUID) error
 }
 
 var _ Querier = (*Queries)(nil)
