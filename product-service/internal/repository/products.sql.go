@@ -249,6 +249,7 @@ FROM
   json_to_recordset($1::json) AS p("productId" uuid, quantity int)
 WHERE
   products.id = p."productId"
+  AND products.stock_quantity >= p.quantity
 `
 
 func (q *Queries) UpdateStockBatch(ctx context.Context, updateParams []byte) (int64, error) {

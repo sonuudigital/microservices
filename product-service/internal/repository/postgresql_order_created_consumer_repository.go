@@ -29,7 +29,7 @@ func (r *PostgreSQLOrderCreatedConsumerRepository) GetProcessedEventByAggregateI
 	return r.Queries.GetProcessedEventByAggregateIDAndEventName(ctx, arg)
 }
 
-func (r *PostgreSQLOrderCreatedConsumerRepository) UpdateStockBatch(ctx context.Context, event *events.OrderCreatedEvent) (int64, error) {
+func (r *PostgreSQLOrderCreatedConsumerRepository) UpdateStockBatch(ctx context.Context, event *events.OrderCreatedEvent, createOutboxEventOnFailure bool, outboxEventName string, outboxEventPayload []byte) (int64, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return 0, err
@@ -59,6 +59,17 @@ func (r *PostgreSQLOrderCreatedConsumerRepository) UpdateStockBatch(ctx context.
 		return 0, err
 	}
 
+	expectedRows := int64(len(event.Products))
+	if rowsAffected != expectedRows && createOutboxEventOnFailure {
+		if err = q.CreateOutboxEvent(ctx, CreateOutboxEventParams{
+			AggregateID: orderUUID,
+			EventName:   outboxEventName,
+			Payload:     outboxEventPayload,
+		}); err != nil {
+			return 0, err
+		}
+	}
+
 	return rowsAffected, tx.Commit(ctx)
 }
 
@@ -71,18 +82,6 @@ func marshalOrderItems(event *events.OrderCreatedEvent) ([]byte, error) {
 		}
 	}
 	return json.Marshal(orderProductItems)
-}
-
-func (r *PostgreSQLOrderCreatedConsumerRepository) CreateOutboxEvent(ctx context.Context, orderId, eventName string, payload []byte) error {
-	orderUUID, err := parseOrderID(orderId)
-	if err != nil {
-		return err
-	}
-	return r.Queries.CreateOutboxEvent(ctx, CreateOutboxEventParams{
-		AggregateID: orderUUID,
-		EventName:   eventName,
-		Payload:     payload,
-	})
 }
 
 func parseOrderID(orderID string) (pgtype.UUID, error) {

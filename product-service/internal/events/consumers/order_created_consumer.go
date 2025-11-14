@@ -25,8 +25,7 @@ const (
 
 type OrderCreatedConsumerRepository interface {
 	GetProcessedEventByAggregateIDAndEventName(ctx context.Context, arg repository.GetProcessedEventByAggregateIDAndEventNameParams) (repository.ProcessedEvent, error)
-	UpdateStockBatch(ctx context.Context, event *events.OrderCreatedEvent) (int64, error)
-	CreateOutboxEvent(ctx context.Context, orderId, eventName string, payload []byte) error
+	UpdateStockBatch(ctx context.Context, event *events.OrderCreatedEvent, createOutboxEventOnFailure bool, outboxEventName string, outboxEventPayload []byte) (int64, error)
 }
 
 type OrderCreatedConsumer struct {
@@ -68,14 +67,24 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		"productsCount", len(orderCreatedEvent.Products),
 	)
 
-	rowsAffected, err := occ.repo.UpdateStockBatch(ctx, orderCreatedEvent)
+	stockUpdateFailedEventData, err := json.Marshal(events.StockUpdateFailedEvent{
+		OrderID:  orderCreatedEvent.OrderID,
+		Products: orderCreatedEvent.Products,
+	})
+	if err != nil {
+		occ.logger.Error("failed to marshal StockUpdateFailedEvent", "error", err, "orderId", orderCreatedEvent.OrderID)
+		d.Nack(false, false)
+		return
+	}
+
+	rowsAffected, err := occ.repo.UpdateStockBatch(ctx, orderCreatedEvent, true, stockUpdateFailedEventName, stockUpdateFailedEventData)
 	if err != nil {
 		occ.logger.Error("failed to update stock batch transactionally", "error", err, "orderId", orderCreatedEvent.OrderID)
 		d.Nack(false, true)
 		return
 	}
 
-	if !occ.validateStockUpdate(ctx, orderCreatedEvent, rowsAffected, d) {
+	if !occ.validateStockUpdate(orderCreatedEvent, rowsAffected, d) {
 		return
 	}
 
@@ -134,7 +143,7 @@ func (occ *OrderCreatedConsumer) isEventProcessed(ctx context.Context, aggregate
 	return processedEvent.ID.Valid, nil
 }
 
-func (occ *OrderCreatedConsumer) validateStockUpdate(ctx context.Context, event *events.OrderCreatedEvent, rowsAffected int64, d amqp091.Delivery) bool {
+func (occ *OrderCreatedConsumer) validateStockUpdate(event *events.OrderCreatedEvent, rowsAffected int64, d amqp091.Delivery) bool {
 	expectedRows := int64(len(event.Products))
 	if rowsAffected != expectedRows {
 		occ.logger.Error(
@@ -144,35 +153,11 @@ func (occ *OrderCreatedConsumer) validateStockUpdate(ctx context.Context, event 
 			"orderId", event.OrderID,
 			"products", event.Products,
 		)
-
-		if err := occ.createOutboxEventForStockUpdateFailure(ctx, event, stockUpdateFailedEventName); err != nil {
-			occ.logger.Error("failed to create outbox event for stock update failure", "error", err, "orderId", event.OrderID)
-			d.Nack(false, true)
-			return false
-		}
-
 		d.Nack(false, false)
 		return false
 	}
 
 	return true
-}
-
-func (occ *OrderCreatedConsumer) createOutboxEventForStockUpdateFailure(ctx context.Context, event *events.OrderCreatedEvent, eventName string) error {
-	eventData, err := json.Marshal(events.StockUpdateFailedEvent{
-		OrderID:  event.OrderID,
-		Products: event.Products,
-	})
-	if err != nil {
-		return err
-	}
-
-	if err = occ.repo.CreateOutboxEvent(ctx, event.OrderID, eventName, eventData); err != nil {
-		return err
-	} else {
-		occ.logger.Warn("created outbox event for stock update failure", "orderId", event.OrderID, "eventName", eventName)
-		return nil
-	}
 }
 
 func (occ *OrderCreatedConsumer) invalidateCacheForUpdatedProducts(ctx context.Context, products []events.OrderItem) {
