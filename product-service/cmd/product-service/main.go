@@ -16,10 +16,11 @@ import (
 	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	"github.com/sonuudigital/microservices/product-service/internal/events/consumers"
-	"github.com/sonuudigital/microservices/product-service/internal/events/worker"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	"github.com/sonuudigital/microservices/product-service/internal/grpc/category"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
+	repo_postgres "github.com/sonuudigital/microservices/product-service/internal/repository/postgres"
+	"github.com/sonuudigital/microservices/shared/events/worker"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/rabbitmq"
@@ -133,8 +134,13 @@ func startMessageRelayerWorker(ctx context.Context, logger logs.Logger, rabbitmq
 		logger.Error("failed to get message relayer config from env", "error", err)
 		os.Exit(1)
 	}
-	mr := worker.New(logger, rabbitmq, repository.New(repo), pollInterval, batchSize)
-	mr.Start(ctx)
+	worker.NewOutboxEventMessageRelayer(
+		logger,
+		rabbitmq,
+		repo_postgres.NewOutboxEventMessageRelayerRepository(repo),
+		pollInterval,
+		batchSize,
+	).Start(ctx)
 }
 
 func startRabbitMQConsumer(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, redisClient *redis.Client, repo consumers.OrderCreatedConsumerRepository) error {

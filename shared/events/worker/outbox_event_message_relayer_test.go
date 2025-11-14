@@ -5,8 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/sonuudigital/microservices/order-service/internal/repository"
+	"github.com/sonuudigital/microservices/shared/events"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -16,12 +15,12 @@ type MockOutboxEventRepository struct {
 	mock.Mock
 }
 
-func (m *MockOutboxEventRepository) GetUnpublishedOutboxEvents(ctx context.Context, limit int32) ([]repository.OutboxEvent, error) {
+func (m *MockOutboxEventRepository) GetUnpublishedOutboxEvents(ctx context.Context, limit int32) ([]events.OutboxEvent, error) {
 	args := m.Called(ctx, limit)
-	return args.Get(0).([]repository.OutboxEvent), args.Error(1)
+	return args.Get(0).([]events.OutboxEvent), args.Error(1)
 }
 
-func (m *MockOutboxEventRepository) UpdateOutboxEventStatus(ctx context.Context, eventID pgtype.UUID) error {
+func (m *MockOutboxEventRepository) UpdateOutboxEventStatus(ctx context.Context, eventID string) error {
 	args := m.Called(ctx, eventID)
 	return args.Error(0)
 }
@@ -36,9 +35,8 @@ func (m *MockRabbitMQPublisher) Publish(ctx context.Context, exchange string, bo
 }
 
 func TestProcessEvents(t *testing.T) {
-	eventID := pgtype.UUID{Bytes: [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, Valid: true}
-	testEvent := repository.OutboxEvent{
-		ID:        eventID,
+	testEvent := events.OutboxEvent{
+		ID:        "test-event-id",
 		EventName: "order_created_exchange",
 		Payload:   []byte(`{"order_id":"test-order"}`),
 	}
@@ -47,9 +45,9 @@ func TestProcessEvents(t *testing.T) {
 
 		mockRepo := new(MockOutboxEventRepository)
 		mockPublisher := new(MockRabbitMQPublisher)
-		relayer := New(logs.NewSlogLogger(), mockPublisher, mockRepo, 0, 10)
+		relayer := NewOutboxEventMessageRelayer(logs.NewSlogLogger(), mockPublisher, mockRepo, 0, 10)
 
-		events := []repository.OutboxEvent{testEvent}
+		events := []events.OutboxEvent{testEvent}
 		mockRepo.On("GetUnpublishedOutboxEvents", mock.Anything, int32(10)).Return(events, nil).Once()
 		mockPublisher.On("Publish", mock.Anything, testEvent.EventName, testEvent.Payload).Return(nil).Once()
 		mockRepo.On("UpdateOutboxEventStatus", mock.Anything, testEvent.ID).Return(nil).Once()
@@ -65,34 +63,28 @@ func TestProcessEvents(t *testing.T) {
 
 		mockRepo := new(MockOutboxEventRepository)
 		mockPublisher := new(MockRabbitMQPublisher)
-		relayer := New(logs.NewSlogLogger(), mockPublisher, mockRepo, 0, 10)
+		relayer := NewOutboxEventMessageRelayer(logs.NewSlogLogger(), mockPublisher, mockRepo, 0, 10)
 
-		events := []repository.OutboxEvent{testEvent}
-		publishErr := errors.New("rabbitmq is down")
-
+		events := []events.OutboxEvent{testEvent}
 		mockRepo.On("GetUnpublishedOutboxEvents", mock.Anything, int32(10)).Return(events, nil).Once()
-		mockPublisher.On("Publish", mock.Anything, testEvent.EventName, testEvent.Payload).Return(publishErr).Once()
+		mockPublisher.On("Publish", mock.Anything, testEvent.EventName, testEvent.Payload).Return(errors.New("publish error")).Once()
 
 		err := relayer.processEvents(context.Background())
 
 		assert.NoError(t, err)
 		mockRepo.AssertExpectations(t)
 		mockPublisher.AssertExpectations(t)
-		mockRepo.AssertNotCalled(t, "UpdateOutboxEventStatus", mock.Anything, mock.Anything)
 	})
 
 	t.Run("UpdateStatusError", func(t *testing.T) {
-
 		mockRepo := new(MockOutboxEventRepository)
 		mockPublisher := new(MockRabbitMQPublisher)
-		relayer := New(logs.NewSlogLogger(), mockPublisher, mockRepo, 0, 10)
+		relayer := NewOutboxEventMessageRelayer(logs.NewSlogLogger(), mockPublisher, mockRepo, 0, 10)
 
-		events := []repository.OutboxEvent{testEvent}
-		updateErr := errors.New("db connection lost")
-
+		events := []events.OutboxEvent{testEvent}
 		mockRepo.On("GetUnpublishedOutboxEvents", mock.Anything, int32(10)).Return(events, nil).Once()
 		mockPublisher.On("Publish", mock.Anything, testEvent.EventName, testEvent.Payload).Return(nil).Once()
-		mockRepo.On("UpdateOutboxEventStatus", mock.Anything, testEvent.ID).Return(updateErr).Once()
+		mockRepo.On("UpdateOutboxEventStatus", mock.Anything, testEvent.ID).Return(errors.New("update status error")).Once()
 
 		err := relayer.processEvents(context.Background())
 
@@ -102,19 +94,16 @@ func TestProcessEvents(t *testing.T) {
 	})
 
 	t.Run("NoEvents", func(t *testing.T) {
-
 		mockRepo := new(MockOutboxEventRepository)
 		mockPublisher := new(MockRabbitMQPublisher)
-		relayer := New(logs.NewSlogLogger(), mockPublisher, mockRepo, 0, 10)
+		relayer := NewOutboxEventMessageRelayer(logs.NewSlogLogger(), mockPublisher, mockRepo, 0, 10)
 
-		events := []repository.OutboxEvent{}
-		mockRepo.On("GetUnpublishedOutboxEvents", mock.Anything, int32(10)).Return(events, nil).Once()
+		mockRepo.On("GetUnpublishedOutboxEvents", mock.Anything, int32(10)).Return([]events.OutboxEvent{}, nil).Once()
 
 		err := relayer.processEvents(context.Background())
 
 		assert.NoError(t, err)
 		mockRepo.AssertExpectations(t)
-		mockPublisher.AssertNotCalled(t, "Publish", mock.Anything, mock.Anything, mock.Anything)
-		mockRepo.AssertNotCalled(t, "UpdateOutboxEventStatus", mock.Anything, mock.Anything)
+		mockPublisher.AssertExpectations(t)
 	})
 }
