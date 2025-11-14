@@ -101,6 +101,24 @@ func (m *MockQuerier) CreateProcessedEvent(ctx context.Context, arg repository.C
 	return args.Error(0)
 }
 
+func (m *MockQuerier) CreateOutboxEvent(ctx context.Context, arg repository.CreateOutboxEventParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) GetUnpublishedOutboxEvents(ctx context.Context, limit int32) ([]repository.OutboxEvent, error) {
+	args := m.Called(ctx, limit)
+	if p, ok := args.Get(0).([]repository.OutboxEvent); ok {
+		return p, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuerier) UpdateOutboxEventStatus(ctx context.Context, id pgtype.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func (m *MockQuerier) GetProcessedEventByAggregateIDAndEventName(ctx context.Context, arg repository.GetProcessedEventByAggregateIDAndEventNameParams) (repository.ProcessedEvent, error) {
 	args := m.Called(ctx, arg)
 	if p, ok := args.Get(0).(repository.ProcessedEvent); ok {
