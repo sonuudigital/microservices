@@ -2,15 +2,19 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	orderv1 "github.com/sonuudigital/microservices/gen/order/v1"
+	"github.com/sonuudigital/microservices/order-service/internal/events/consumers"
 	"github.com/sonuudigital/microservices/order-service/internal/grpc/clients"
 	"github.com/sonuudigital/microservices/order-service/internal/grpc/order"
 	"github.com/sonuudigital/microservices/order-service/internal/repository"
@@ -21,6 +25,7 @@ import (
 	"github.com/sonuudigital/microservices/shared/rabbitmq"
 	"github.com/sonuudigital/microservices/shared/web"
 	"github.com/sonuudigital/microservices/shared/web/health"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
@@ -54,17 +59,22 @@ func main() {
 	}
 	defer rabbitmq.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	initializeServicesAndWaitForShutdown(logger, rabbitmq, pgDb, grpcClients)
+}
+
+func initializeServicesAndWaitForShutdown(logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, pgDb *pgxpool.Pool, grpcClients *clients.Clients) {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	g, gCtx := errgroup.WithContext(ctx)
 
 	orderRepo := repository.NewPostgreSQLOrderRepository(pgDb)
 
 	mrPollInterval, mrBatchSize, err := getMessageRelayerConfigFromEnv()
 	if err != nil {
-		logger.Error("failed to get message relayer config from env", "error", err)
+		logger.Error("failed to get message relayer config", "error", err)
 		os.Exit(1)
 	}
-
 	go worker.NewOutboxEventMessageRelayer(
 		logger,
 		rabbitmq,
@@ -73,20 +83,39 @@ func main() {
 		mrBatchSize,
 	).Start(ctx)
 
-	startGRPCServer(ctx, logger, pgDb, grpcClients, orderRepo)
+	g.Go(func() error {
+		stockUpdateFailedConsumer := consumers.NewStockUpdateFailedConsumer(logger, orderRepo, rabbitmq)
+		logger.Info("starting StockUpdateFailedConsumer")
+
+		if err := stockUpdateFailedConsumer.Start(gCtx); err != nil {
+			return fmt.Errorf("StockUpdateFailedConsumer failed: %w", err)
+		}
+
+		logger.Info("StockUpdateFailedConsumer stopped gracefully")
+		return nil
+	})
+
+	g.Go(func() error {
+		return startGRPCServer(gCtx, logger, pgDb, grpcClients, orderRepo)
+	})
+
+	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+		logger.Error("application exited with error", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("application shut down gracefully")
 }
 
-func startGRPCServer(ctx context.Context, logger logs.Logger, pgDb *pgxpool.Pool, grpcClients *clients.Clients, orderRepo *repository.PostgreSQLOrderRepository) {
+func startGRPCServer(ctx context.Context, logger logs.Logger, pgDb *pgxpool.Pool, grpcClients *clients.Clients, orderRepo *repository.PostgreSQLOrderRepository) error {
 	gRPCPort := os.Getenv("ORDER_SERVICE_GRPC_PORT")
 	if gRPCPort == "" {
-		logger.Error("ORDER_SERVICE_GRPC_PORT is not set")
-		os.Exit(1)
+		return fmt.Errorf("ORDER_SERVICE_GRPC_PORT is not set")
 	}
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", gRPCPort))
 	if err != nil {
-		logger.Error("failed to listen on gRPC port", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to listen for gRPC: %w", err)
 	}
 
 	grpcServer := grpc.NewServer()
@@ -106,20 +135,18 @@ func startGRPCServer(ctx context.Context, logger logs.Logger, pgDb *pgxpool.Pool
 		}
 	})
 
-	web.StartGRPCServerAndWaitForShutdown(ctx, grpcServer, lis, logger)
+	return web.StartGRPCServerAndWaitForShutdown(ctx, grpcServer, lis, logger)
 }
 
 func initializegRPCClients(logger logs.Logger) (*clients.Clients, error) {
 	cartServiceURL := os.Getenv("CART_SERVICE_GRPC_URL")
 	if cartServiceURL == "" {
-		logger.Error("CART_SERVICE_GRPC_URL is not set")
-		os.Exit(1)
+		return nil, fmt.Errorf("CART_SERVICE_GRPC_URL is not set")
 	}
 
 	paymentServiceURL := os.Getenv("PAYMENT_SERVICE_GRPC_URL")
 	if paymentServiceURL == "" {
-		logger.Error("PAYMENT_SERVICE_GRPC_URL is not set")
-		os.Exit(1)
+		return nil, fmt.Errorf("PAYMENT_SERVICE_GRPC_URL is not set")
 	}
 
 	clientsURL := clients.NewClienstURL(cartServiceURL, paymentServiceURL)
