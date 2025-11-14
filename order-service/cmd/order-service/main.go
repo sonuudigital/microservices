@@ -11,10 +11,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	orderv1 "github.com/sonuudigital/microservices/gen/order/v1"
-	"github.com/sonuudigital/microservices/order-service/internal/events/worker"
 	"github.com/sonuudigital/microservices/order-service/internal/grpc/clients"
 	"github.com/sonuudigital/microservices/order-service/internal/grpc/order"
 	"github.com/sonuudigital/microservices/order-service/internal/repository"
+	postgres_repo "github.com/sonuudigital/microservices/order-service/internal/repository/postgres"
+	"github.com/sonuudigital/microservices/shared/events/worker"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/sonuudigital/microservices/shared/postgres"
 	"github.com/sonuudigital/microservices/shared/rabbitmq"
@@ -63,8 +64,14 @@ func main() {
 		logger.Error("failed to get message relayer config from env", "error", err)
 		os.Exit(1)
 	}
-	mr := worker.New(logger, rabbitmq, orderRepo, mrPollInterval, mrBatchSize)
-	go mr.Start(ctx)
+
+	go worker.NewOutboxEventMessageRelayer(
+		logger,
+		rabbitmq,
+		postgres_repo.NewOutboxEventMessageRelayerRepository(pgDb),
+		mrPollInterval,
+		mrBatchSize,
+	).Start(ctx)
 
 	startGRPCServer(ctx, logger, pgDb, grpcClients, orderRepo)
 }

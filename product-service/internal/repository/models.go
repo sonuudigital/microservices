@@ -5,15 +5,60 @@
 package repository
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type OutboxEventStatus string
+
+const (
+	OutboxEventStatusUNPUBLISHED OutboxEventStatus = "UNPUBLISHED"
+	OutboxEventStatusPUBLISHED   OutboxEventStatus = "PUBLISHED"
+)
+
+func (e *OutboxEventStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = OutboxEventStatus(s)
+	case string:
+		*e = OutboxEventStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for OutboxEventStatus: %T", src)
+	}
+	return nil
+}
+
+type NullOutboxEventStatus struct {
+	OutboxEventStatus OutboxEventStatus `json:"outboxEventStatus"`
+	Valid             bool              `json:"valid"` // Valid is true if OutboxEventStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullOutboxEventStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.OutboxEventStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.OutboxEventStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullOutboxEventStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.OutboxEventStatus), nil
+}
 
 type OutboxEvent struct {
 	ID          pgtype.UUID        `json:"id"`
 	AggregateID pgtype.UUID        `json:"aggregateId"`
 	EventName   string             `json:"eventName"`
 	Payload     []byte             `json:"payload"`
-	Status      interface{}        `json:"status"`
+	Status      OutboxEventStatus  `json:"status"`
 	CreatedAt   pgtype.Timestamptz `json:"createdAt"`
 	PublishedAt pgtype.Timestamptz `json:"publishedAt"`
 }
