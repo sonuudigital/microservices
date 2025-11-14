@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) error
 	CreateProcessedEvent(ctx context.Context, arg CreateProcessedEventParams) error
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	CreateProductCategory(ctx context.Context, arg CreateProductCategoryParams) (ProductCategory, error)
@@ -21,7 +22,9 @@ type Querier interface {
 	GetProductCategories(ctx context.Context) ([]ProductCategory, error)
 	GetProductsByCategoryID(ctx context.Context, categoryID pgtype.UUID) ([]Product, error)
 	GetProductsByIDs(ctx context.Context, productIds []pgtype.UUID) ([]Product, error)
+	GetUnpublishedOutboxEvents(ctx context.Context, limit int32) ([]OutboxEvent, error)
 	ListProductsPaginated(ctx context.Context, arg ListProductsPaginatedParams) ([]Product, error)
+	UpdateOutboxEventStatus(ctx context.Context, id pgtype.UUID) error
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 	UpdateProductCategory(ctx context.Context, arg UpdateProductCategoryParams) error
 	UpdateStockBatch(ctx context.Context, updateParams []byte) (int64, error)

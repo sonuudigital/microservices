@@ -73,6 +73,18 @@ func marshalOrderItems(event *events.OrderCreatedEvent) ([]byte, error) {
 	return json.Marshal(orderProductItems)
 }
 
+func (r *PostgreSQLOrderCreatedConsumerRepository) CreateOutboxEvent(ctx context.Context, orderId, eventName string, payload []byte) error {
+	orderUUID, err := parseOrderID(orderId)
+	if err != nil {
+		return err
+	}
+	return r.Queries.CreateOutboxEvent(ctx, CreateOutboxEventParams{
+		AggregateID: orderUUID,
+		EventName:   eventName,
+		Payload:     payload,
+	})
+}
+
 func parseOrderID(orderID string) (pgtype.UUID, error) {
 	var orderUUID pgtype.UUID
 	if err := orderUUID.Scan(orderID); err != nil {

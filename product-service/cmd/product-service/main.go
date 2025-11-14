@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
 	"github.com/sonuudigital/microservices/product-service/internal/events/consumers"
+	"github.com/sonuudigital/microservices/product-service/internal/events/worker"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	"github.com/sonuudigital/microservices/product-service/internal/grpc/category"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
@@ -78,6 +80,8 @@ func initializeServicesAndWaitForShutdown(logger logs.Logger, rabbitmq *rabbitmq
 		return startGRPCServer(gCtx, pgDb, redisClient, logger)
 	})
 
+	go startMessageRelayerWorker(gCtx, logger, rabbitmq, pgDb)
+
 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		logger.Error("application exited with error", "error", err)
 		os.Exit(1)
@@ -121,6 +125,16 @@ func startGRPCServer(ctx context.Context, pgDb *pgxpool.Pool, redisClient *redis
 	})
 
 	return web.StartGRPCServerAndWaitForShutdown(ctx, grpcServer, lis, logger)
+}
+
+func startMessageRelayerWorker(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, repo *pgxpool.Pool) {
+	pollInterval, batchSize, err := getMessageRelayerConfigFromEnv()
+	if err != nil {
+		logger.Error("failed to get message relayer config from env", "error", err)
+		os.Exit(1)
+	}
+	mr := worker.New(logger, rabbitmq, repository.New(repo), pollInterval, batchSize)
+	mr.Start(ctx)
 }
 
 func startRabbitMQConsumer(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, redisClient *redis.Client, repo consumers.OrderCreatedConsumerRepository) error {
@@ -168,4 +182,28 @@ func initializeRabbitMQ(logger logs.Logger) (*rabbitmq.RabbitMQ, error) {
 	}
 
 	return rabbitmq, nil
+}
+
+func getMessageRelayerConfigFromEnv() (time.Duration, int32, error) {
+	pollIntervalStr := os.Getenv("MESSAGE_RELAYER_POLL_INTERVAL")
+	if pollIntervalStr == "" {
+		pollIntervalStr = "5s"
+	}
+
+	pollInterval, err := time.ParseDuration(pollIntervalStr)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid MESSAGE_RELAYER_POLL_INTERVAL: %w", err)
+	}
+
+	batchSizeStr := os.Getenv("MESSAGE_RELAYER_BATCH_SIZE")
+	if batchSizeStr == "" {
+		batchSizeStr = "25"
+	}
+
+	batchSize, err := strconv.Atoi(batchSizeStr)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid MESSAGE_RELAYER_BATCH_SIZE: %w", err)
+	}
+
+	return pollInterval, int32(batchSize), nil
 }
