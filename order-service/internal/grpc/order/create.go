@@ -25,26 +25,43 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 		return nil, err
 	}
 
-	_, err = s.processPayment(ctx, "", req.UserId, cart.TotalPrice)
-	if err != nil {
-		return nil, err
-	}
-
 	gRPCOrder, err := s.repository.CreateOrder(ctx, req.UserId, cart.TotalPrice, cart.Products)
 	if err != nil {
 		s.logger.Error(
-			"CRITICAL: payment succeeded but failed to create order and outbox event",
+			"failed to create order and outbox event",
 			"error", err,
 			"userId", req.UserId,
 			"cartId", cart.Id,
 		)
-		return nil, status.Errorf(codes.Internal, "failed to finalize order after successful payment")
+		return nil, status.Errorf(codes.Internal, "failed to create order: %v", err)
 	}
 
 	s.logger.Debug(
-		"Order created and outbox event recorded",
+		"order created and outbox event recorded",
 		"orderId", gRPCOrder.Id,
 		"userId", gRPCOrder.UserId,
+		"totalAmount", gRPCOrder.TotalAmount,
+	)
+
+	payment, err := s.processPayment(ctx, gRPCOrder.Id, req.UserId, cart.TotalPrice)
+	if err != nil {
+		s.logger.Error(
+			"order created but payment processing failed",
+			"error", err,
+			"orderId", gRPCOrder.Id,
+			"userId", req.UserId,
+			"amount", cart.TotalPrice,
+		)
+		// TODO: Implement compensation logic (cancel order or mark as payment failed)
+		return nil, err
+	}
+
+	s.logger.Info(
+		"order created successfully with payment processed",
+		"orderId", gRPCOrder.Id,
+		"userId", gRPCOrder.UserId,
+		"paymentId", payment.Id,
+		"totalAmount", gRPCOrder.TotalAmount,
 	)
 
 	return gRPCOrder, nil

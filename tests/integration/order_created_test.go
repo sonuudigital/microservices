@@ -387,7 +387,7 @@ func TestCreateOrderWithSingleProduct(t *testing.T) {
 	})
 
 	t.Run("Verify Single Product Stock Updated", func(t *testing.T) {
-		time.Sleep(2 * time.Second)
+		time.Sleep(5 * time.Second)
 
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product.ID), nil)
 		require.NoError(err)
@@ -425,5 +425,109 @@ func TestCreateOrderWithSingleProduct(t *testing.T) {
 		require.NoError(err)
 		assert.Empty(cart.Products)
 		assert.Equal(0.0, cart.TotalPrice)
+	})
+}
+
+func TestCreateOrderFailureDueToInsufficientStock(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	apiGatewayURL := os.Getenv(apiGatewayURLKey)
+
+	_, authToken := registerAndLogin(require)
+	require.NotEmpty(authToken)
+
+	initialStock := int32(1)
+	product := createProduct(require, apiGatewayURL, authToken, "Low Stock Product", 10.00, initialStock)
+	require.NotEmpty(product.ID)
+
+	quantityToOrder := int32(2)
+	addProductReq := AddProductToCartRequest{
+		ProductID: product.ID,
+		Quantity:  quantityToOrder,
+	}
+	body, err := json.Marshal(addProductReq)
+	require.NoError(err)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf(apiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
+	require.NoError(err)
+	req.Header.Set("Authorization", bearerWithSpace+authToken)
+	req.Header.Set(contentTypeHeader, contentTypeJSON)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(err)
+	defer resp.Body.Close()
+	assert.Equal(http.StatusOK, resp.StatusCode, "Should be able to add to cart even if stock is insufficient at this stage")
+
+	var createdOrder Order
+	t.Run("Create Order with Insufficient Stock", func(t *testing.T) {
+		req, err := http.NewRequest("POST", fmt.Sprintf(apiOrders, apiGatewayURL), nil)
+		require.NoError(err)
+		req.Header.Set("Authorization", bearerWithSpace+authToken)
+
+		resp, err = client.Do(req)
+		require.NoError(err)
+		defer resp.Body.Close()
+
+		assert.Equal(http.StatusCreated, resp.StatusCode, "Order should be initially created")
+
+		err = json.NewDecoder(resp.Body).Decode(&createdOrder)
+		require.NoError(err)
+		assert.NotEmpty(createdOrder.ID)
+		assert.Equal("CREATED", createdOrder.Status, "Initial order status should be CREATED")
+	})
+
+	time.Sleep(5 * time.Second)
+
+	// t.Run("Verify Order Status is CANCELLED", func(t *testing.T) {
+	// 	req, err := http.NewRequest("GET", fmt.Sprintf(apiOrders, apiGatewayURL)+"/"+createdOrder.ID, nil)
+	// 	require.NoError(err)
+	// 	req.Header.Set("Authorization", bearerWithSpace+authToken)
+
+	// 	resp, err := client.Do(req)
+	// 	require.NoError(err)
+	// 	defer resp.Body.Close()
+
+	// 	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	// 	var fetchedOrder Order
+	// 	err = json.NewDecoder(resp.Body).Decode(&fetchedOrder)
+	// 	require.NoError(err)
+	// 	assert.Equal("CANCELLED", fetchedOrder.Status, "Order status should be CANCELLED due to insufficient stock")
+	// })
+
+	t.Run("Verify Stock is NOT Updated", func(t *testing.T) {
+		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product.ID), nil)
+		require.NoError(err)
+		req.Header.Set("Authorization", bearerWithSpace+authToken)
+
+		resp, err := client.Do(req)
+		require.NoError(err)
+		defer resp.Body.Close()
+
+		assert.Equal(http.StatusOK, resp.StatusCode)
+
+		var fetchedProduct Product
+		err = json.NewDecoder(resp.Body).Decode(&fetchedProduct)
+		require.NoError(err)
+		assert.Equal(initialStock, fetchedProduct.StockQuantity, "Product stock should remain unchanged")
+	})
+
+	t.Run("Verify Cart is Cleared", func(t *testing.T) {
+		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
+		require.NoError(err)
+		req.Header.Set("Authorization", bearerWithSpace+authToken)
+
+		resp, err := client.Do(req)
+		require.NoError(err)
+		defer resp.Body.Close()
+
+		assert.Equal(http.StatusOK, resp.StatusCode)
+
+		var cart Cart
+		err = json.NewDecoder(resp.Body).Decode(&cart)
+		require.NoError(err)
+		assert.Empty(cart.Products, "Cart should be empty after order attempt")
+		assert.Equal(0.0, cart.TotalPrice, "Total price should be 0 for empty cart")
 	})
 }

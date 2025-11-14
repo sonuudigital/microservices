@@ -40,7 +40,8 @@ SET
 FROM
   json_to_recordset(sqlc.arg(update_params)::json) AS p("productId" uuid, quantity int)
 WHERE
-  products.id = p."productId";
+  products.id = p."productId"
+  AND products.stock_quantity >= p.quantity;
 
 -- name: DeleteProduct :exec
 DELETE FROM products
