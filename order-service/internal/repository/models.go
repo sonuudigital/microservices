@@ -16,6 +16,7 @@ type OutboxEventStatus string
 const (
 	OutboxEventStatusUNPUBLISHED OutboxEventStatus = "UNPUBLISHED"
 	OutboxEventStatusPUBLISHED   OutboxEventStatus = "PUBLISHED"
+	OutboxEventStatusCANCELLED   OutboxEventStatus = "CANCELLED"
 )
 
 func (e *OutboxEventStatus) Scan(src interface{}) error {

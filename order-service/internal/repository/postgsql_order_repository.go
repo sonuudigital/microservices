@@ -48,7 +48,12 @@ func (s *PostgreSQLOrderRepository) execTx(ctx context.Context, fn func(*Queries
 func (s *PostgreSQLOrderRepository) CreateOrder(ctx context.Context, userID string, totalAmount float64, products []*cartv1.CartProduct) (*orderv1.Order, error) {
 	var createdOrder *orderv1.Order
 	err := s.execTx(ctx, func(q *Queries) error {
-		userUUID, pgTotalAmount, err := validateAndTransformCreateOrderParams(userID, totalAmount)
+		userUUID, err := mapStringToPgUUID(userID)
+		if err != nil {
+			return err
+		}
+
+		pgTotalAmount, err := mapFloatToPgNumeric(totalAmount)
 		if err != nil {
 			return err
 		}
@@ -93,18 +98,32 @@ func (s *PostgreSQLOrderRepository) CreateOrder(ctx context.Context, userID stri
 	}
 }
 
-func validateAndTransformCreateOrderParams(userID string, totalAmount float64) (pgtype.UUID, pgtype.Numeric, error) {
-	var userUUID pgtype.UUID
-	if err := userUUID.Scan(userID); err != nil {
-		return pgtype.UUID{}, pgtype.Numeric{}, fmt.Errorf("invalid user ID: %w", err)
-	}
+func (s *PostgreSQLOrderRepository) CancelOrder(ctx context.Context, orderID string) error {
+	return s.execTx(ctx, func(q *Queries) error {
+		orderUUID, err := mapStringToPgUUID(orderID)
+		if err != nil {
+			return err
+		}
 
-	var pgTotalAmount pgtype.Numeric
-	if err := pgTotalAmount.Scan(fmt.Sprintf("%.2f", totalAmount)); err != nil {
-		return pgtype.UUID{}, pgtype.Numeric{}, fmt.Errorf("failed to parse total amount: %w", err)
-	}
+		canceledStatus, err := q.GetOrderStatusByName(ctx, "CANCELED")
+		if err != nil {
+			return fmt.Errorf("failed to get CANCELED status: %w", err)
+		}
 
-	return userUUID, pgTotalAmount, nil
+		_, err = q.UpdateOrderStatus(ctx, UpdateOrderStatusParams{
+			ID:     orderUUID,
+			Status: canceledStatus.ID,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update order status to CANCELED: %w", err)
+		}
+
+		if err = q.CancelOutboxEventStatusByAggregateID(ctx, orderUUID); err != nil {
+			return fmt.Errorf("failed to cancel outbox event status: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func generateOrderCreatedEventPayload(orderID, userID string, products []*cartv1.CartProduct) ([]byte, error) {
@@ -128,6 +147,22 @@ func generateOrderCreatedEventPayload(orderID, userID string, products []*cartv1
 	}
 
 	return encodedEvent, nil
+}
+
+func mapStringToPgUUID(value string) (pgtype.UUID, error) {
+	var pgUUID pgtype.UUID
+	if err := pgUUID.Scan(value); err != nil {
+		return pgtype.UUID{}, fmt.Errorf("invalid UUID: %w", err)
+	}
+	return pgUUID, nil
+}
+
+func mapFloatToPgNumeric(value float64) (pgtype.Numeric, error) {
+	var pgNumeric pgtype.Numeric
+	if err := pgNumeric.Scan(fmt.Sprintf("%.2f", value)); err != nil {
+		return pgtype.Numeric{}, fmt.Errorf("failed to parse numeric: %w", err)
+	}
+	return pgNumeric, nil
 }
 
 func mapRepositoryToGRPC(o *Order, statusName string) (*orderv1.Order, error) {

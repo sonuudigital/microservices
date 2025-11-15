@@ -11,13 +11,14 @@ import (
 )
 
 type Querier interface {
+	CancelOutboxEventStatusByAggregateID(ctx context.Context, aggregateID pgtype.UUID) error
 	CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error)
 	CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) error
 	GetOrderById(ctx context.Context, id pgtype.UUID) (GetOrderByIdRow, error)
 	GetOrderStatusByName(ctx context.Context, name string) (GetOrderStatusByNameRow, error)
 	GetUnpublishedOutboxEvents(ctx context.Context, limit int32) ([]OutboxEvent, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
-	UpdateOutboxEventStatus(ctx context.Context, id pgtype.UUID) error
+	UpdateOutboxEventStatus(ctx context.Context, arg UpdateOutboxEventStatusParams) error
 }
 
 var _ Querier = (*Queries)(nil)
