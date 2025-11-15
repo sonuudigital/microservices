@@ -5,10 +5,17 @@ VALUES ($1, $2, $3);
 -- name: UpdateOutboxEventStatus :exec
 UPDATE outbox_events
 SET
-    status = 'PUBLISHED',
+    status = $2,
     published_at = NOW()
 WHERE
     id = $1;
+
+-- name: CancelOutboxEventStatusByAggregateID :exec
+UPDATE outbox_events
+SET
+    status = 'CANCELLED'
+WHERE
+    aggregate_id = $1;
 
 -- name: GetUnpublishedOutboxEvents :many
 SELECT *

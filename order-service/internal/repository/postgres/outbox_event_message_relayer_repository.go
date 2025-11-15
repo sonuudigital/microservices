@@ -8,6 +8,10 @@ import (
 	"github.com/sonuudigital/microservices/shared/events"
 )
 
+const (
+	outboxEventStatusPublished = "PUBLISHED"
+)
+
 type OutboxEventMessageRelayerRepository struct {
 	*repository.Queries
 }
@@ -43,7 +47,10 @@ func (r *OutboxEventMessageRelayerRepository) UpdateOutboxEventStatus(ctx contex
 	if err != nil {
 		return err
 	}
-	return r.Queries.UpdateOutboxEventStatus(ctx, eventUUID)
+	return r.Queries.UpdateOutboxEventStatus(ctx, repository.UpdateOutboxEventStatusParams{
+		ID:     eventUUID,
+		Status: outboxEventStatusPublished,
+	})
 }
 
 func parseIDStringToUUID(id string) (pgtype.UUID, error) {

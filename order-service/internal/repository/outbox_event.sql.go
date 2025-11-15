@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelOutboxEventStatusByAggregateID = `-- name: CancelOutboxEventStatusByAggregateID :exec
+UPDATE outbox_events
+SET
+    status = 'CANCELLED'
+WHERE
+    aggregate_id = $1
+`
+
+func (q *Queries) CancelOutboxEventStatusByAggregateID(ctx context.Context, aggregateID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, cancelOutboxEventStatusByAggregateID, aggregateID)
+	return err
+}
+
 const createOutboxEvent = `-- name: CreateOutboxEvent :exec
 INSERT INTO outbox_events (aggregate_id, event_name, payload)
 VALUES ($1, $2, $3)
@@ -66,13 +79,18 @@ func (q *Queries) GetUnpublishedOutboxEvents(ctx context.Context, limit int32) (
 const updateOutboxEventStatus = `-- name: UpdateOutboxEventStatus :exec
 UPDATE outbox_events
 SET
-    status = 'PUBLISHED',
+    status = $2,
     published_at = NOW()
 WHERE
     id = $1
 `
 
-func (q *Queries) UpdateOutboxEventStatus(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, updateOutboxEventStatus, id)
+type UpdateOutboxEventStatusParams struct {
+	ID     pgtype.UUID       `json:"id"`
+	Status OutboxEventStatus `json:"status"`
+}
+
+func (q *Queries) UpdateOutboxEventStatus(ctx context.Context, arg UpdateOutboxEventStatusParams) error {
+	_, err := q.db.Exec(ctx, updateOutboxEventStatus, arg.ID, arg.Status)
 	return err
 }

@@ -52,7 +52,20 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 			"userId", req.UserId,
 			"amount", cart.TotalPrice,
 		)
-		// TODO: Implement compensation logic (cancel order or mark as payment failed)
+
+		if err := s.repository.CancelOrder(ctx, gRPCOrder.Id); err != nil {
+			s.logger.Error(
+				"failed to cancel order after payment failure",
+				"error", err,
+				"orderId", gRPCOrder.Id,
+			)
+		} else {
+			s.logger.Info(
+				"order cancelled successfully after payment failure",
+				"orderId", gRPCOrder.Id,
+			)
+		}
+
 		return nil, err
 	}
 
