@@ -88,7 +88,7 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		return
 	}
 
-	occ.invalidateCacheForUpdatedProducts(ctx, orderCreatedEvent.Products)
+	go occ.invalidateCacheForUpdatedProducts(ctx, orderCreatedEvent.Products)
 
 	occ.logger.Info(
 		"successfully updated stock for products in order",

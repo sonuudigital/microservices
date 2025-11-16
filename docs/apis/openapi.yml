@@ -3,7 +3,7 @@ info:
   title: Microservices E-Commerce API
   description: |-
     This is the public-facing API for the E-Commerce platform, provided by the API Gateway.
-    It exposes functionalities from various backend microservices like User, Product, and Cart services.
+    It exposes functionalities from various backend microservices like User, Product, Cart, and Order services.
   version: 1.0.0
 servers:
   - url: /api
@@ -19,6 +19,8 @@ tags:
     description: Management of product categories.
   - name: Cart
     description: Shopping cart operations.
+  - name: Orders
+    description: Order management.
 paths:
   /auth/login:
     post:
@@ -445,6 +447,45 @@ paths:
           description: Product not found in cart
         '500':
           description: Internal Server Error
+  /orders:
+    post:
+      tags:
+        - Orders
+      summary: Create a new order
+      description: Creates a new order from the user's current cart.
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: 'Unprocessable Entity (e.g., empty cart, cart not found)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service Unavailable (e.g., Cart or Payment service is down)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -597,6 +638,24 @@ components:
         quantity:
           type: integer
           format: int32
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        totalAmount:
+          type: number
+          format: double
+        status:
+          type: string
+          example: "CREATED"
+        createdAt:
+          type: string
+          format: date-time
     Error:
       type: object
       properties:
