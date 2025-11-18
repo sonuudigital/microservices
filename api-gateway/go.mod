@@ -1,6 +1,6 @@
 module github.com/sonuudigital/microservices/api-gateway
 
-go 1.25.3
+go 1.25.4
 
 require (
 	github.com/go-redis/redis_rate/v10 v10.0.1
