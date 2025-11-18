@@ -55,6 +55,11 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		return
 	}
 
-	occ.logger.Info("successfully processed OrderCreatedEvent", "deliveryTag", d.DeliveryTag)
+	occ.logger.Info(
+		"successfully processed OrderCreatedEvent",
+		"orderId", orderCreatedEvent.OrderID,
+		"userId", orderCreatedEvent.UserID,
+		"userEmail", orderCreatedEvent.UserEmail,
+	)
 	d.Ack(false)
 }

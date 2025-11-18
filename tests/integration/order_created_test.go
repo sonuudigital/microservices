@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	apiOrders = "%s/api/orders"
+	apiOrders     = "%s/api/orders"
+	sleepDuration = 6 * time.Second
 )
 
 type Order struct {
@@ -133,7 +134,7 @@ func TestCreateOrderSuccess(t *testing.T) {
 	})
 
 	t.Run("Verify Cart is Cleared", func(t *testing.T) {
-		time.Sleep(3 * time.Second)
+		time.Sleep(sleepDuration)
 
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
 		require.NoError(err)
@@ -154,7 +155,7 @@ func TestCreateOrderSuccess(t *testing.T) {
 	})
 
 	t.Run("Verify Stock is Updated", func(t *testing.T) {
-		time.Sleep(2 * time.Second)
+		time.Sleep(sleepDuration)
 
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product1.ID), nil)
 		require.NoError(err)
@@ -258,7 +259,7 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 	})
 
 	t.Run("Verify All Products Stock Updated", func(t *testing.T) {
-		time.Sleep(3 * time.Second)
+		time.Sleep(sleepDuration)
 
 		client := &http.Client{}
 
@@ -313,7 +314,7 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 	})
 
 	t.Run("Verify Cart Cleared After Order", func(t *testing.T) {
-		time.Sleep(2 * time.Second)
+		time.Sleep(sleepDuration)
 
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
 		require.NoError(err)
@@ -387,7 +388,7 @@ func TestCreateOrderWithSingleProduct(t *testing.T) {
 	})
 
 	t.Run("Verify Single Product Stock Updated", func(t *testing.T) {
-		time.Sleep(5 * time.Second)
+		time.Sleep(sleepDuration)
 
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product.ID), nil)
 		require.NoError(err)
@@ -407,7 +408,7 @@ func TestCreateOrderWithSingleProduct(t *testing.T) {
 	})
 
 	t.Run("Verify Cart Cleared", func(t *testing.T) {
-		time.Sleep(1 * time.Second)
+		time.Sleep(sleepDuration)
 
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
 		require.NoError(err)
@@ -477,24 +478,7 @@ func TestCreateOrderFailureDueToInsufficientStock(t *testing.T) {
 		assert.Equal("CREATED", createdOrder.Status, "Initial order status should be CREATED")
 	})
 
-	time.Sleep(5 * time.Second)
-
-	// t.Run("Verify Order Status is CANCELLED", func(t *testing.T) {
-	// 	req, err := http.NewRequest("GET", fmt.Sprintf(apiOrders, apiGatewayURL)+"/"+createdOrder.ID, nil)
-	// 	require.NoError(err)
-	// 	req.Header.Set("Authorization", bearerWithSpace+authToken)
-
-	// 	resp, err := client.Do(req)
-	// 	require.NoError(err)
-	// 	defer resp.Body.Close()
-
-	// 	assert.Equal(http.StatusOK, resp.StatusCode)
-
-	// 	var fetchedOrder Order
-	// 	err = json.NewDecoder(resp.Body).Decode(&fetchedOrder)
-	// 	require.NoError(err)
-	// 	assert.Equal("CANCELLED", fetchedOrder.Status, "Order status should be CANCELLED due to insufficient stock")
-	// })
+	time.Sleep(sleepDuration)
 
 	t.Run("Verify Stock is NOT Updated", func(t *testing.T) {
 		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product.ID), nil)

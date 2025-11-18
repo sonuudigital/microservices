@@ -45,7 +45,7 @@ func (s *PostgreSQLOrderRepository) execTx(ctx context.Context, fn func(*Queries
 	return tx.Commit(ctx)
 }
 
-func (s *PostgreSQLOrderRepository) CreateOrder(ctx context.Context, userID string, totalAmount float64, products []*cartv1.CartProduct) (*orderv1.Order, error) {
+func (s *PostgreSQLOrderRepository) CreateOrder(ctx context.Context, userID, userEmail string, totalAmount float64, products []*cartv1.CartProduct) (*orderv1.Order, error) {
 	var createdOrder *orderv1.Order
 	err := s.execTx(ctx, func(q *Queries) error {
 		userUUID, err := mapStringToPgUUID(userID)
@@ -66,7 +66,7 @@ func (s *PostgreSQLOrderRepository) CreateOrder(ctx context.Context, userID stri
 			return fmt.Errorf("failed to create order: %w", err)
 		}
 
-		encodedEvent, err := generateOrderCreatedEventPayload(dbOrder.ID.String(), dbOrder.UserID.String(), products)
+		encodedEvent, err := generateOrderCreatedEventPayload(dbOrder.ID.String(), dbOrder.UserID.String(), userEmail, products)
 
 		err = q.CreateOutboxEvent(ctx, CreateOutboxEventParams{
 			AggregateID: dbOrder.ID,
@@ -126,7 +126,7 @@ func (s *PostgreSQLOrderRepository) CancelOrder(ctx context.Context, orderID str
 	})
 }
 
-func generateOrderCreatedEventPayload(orderID, userID string, products []*cartv1.CartProduct) ([]byte, error) {
+func generateOrderCreatedEventPayload(orderID, userID, userEmail string, products []*cartv1.CartProduct) ([]byte, error) {
 	eventProducts := make([]events.OrderItem, len(products))
 	for i, p := range products {
 		eventProducts[i] = events.OrderItem{
@@ -136,9 +136,10 @@ func generateOrderCreatedEventPayload(orderID, userID string, products []*cartv1
 	}
 
 	orderCreatedEvent := events.OrderCreatedEvent{
-		OrderID:  orderID,
-		UserID:   userID,
-		Products: eventProducts,
+		OrderID:   orderID,
+		UserID:    userID,
+		UserEmail: userEmail,
+		Products:  eventProducts,
 	}
 
 	encodedEvent, err := json.Marshal(orderCreatedEvent)

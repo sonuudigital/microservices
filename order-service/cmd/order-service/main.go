@@ -46,7 +46,7 @@ func main() {
 	logger.Info("database connected successfully")
 	defer pgDb.Close()
 
-	grpcClients, err := initializegRPCClients(logger)
+	grpcClients, err := initializegRPCClients()
 	if err != nil {
 		logger.Error("failed to initialize gRPC clients", "error", err)
 		os.Exit(1)
@@ -138,7 +138,7 @@ func startGRPCServer(ctx context.Context, logger logs.Logger, pgDb *pgxpool.Pool
 	return web.StartGRPCServerAndWaitForShutdown(ctx, grpcServer, lis, logger)
 }
 
-func initializegRPCClients(logger logs.Logger) (*clients.Clients, error) {
+func initializegRPCClients() (*clients.Clients, error) {
 	cartServiceURL := os.Getenv("CART_SERVICE_GRPC_URL")
 	if cartServiceURL == "" {
 		return nil, fmt.Errorf("CART_SERVICE_GRPC_URL is not set")
@@ -149,7 +149,12 @@ func initializegRPCClients(logger logs.Logger) (*clients.Clients, error) {
 		return nil, fmt.Errorf("PAYMENT_SERVICE_GRPC_URL is not set")
 	}
 
-	clientsURL := clients.NewClienstURL(cartServiceURL, paymentServiceURL)
+	userServiceURL := os.Getenv("USER_SERVICE_GRPC_URL")
+	if userServiceURL == "" {
+		return nil, fmt.Errorf("USER_SERVICE_GRPC_URL is not set")
+	}
+
+	clientsURL := clients.NewClienstURL(cartServiceURL, paymentServiceURL, userServiceURL)
 	grpcClients, err := clients.NewClients(clientsURL)
 	if err != nil {
 		return nil, err

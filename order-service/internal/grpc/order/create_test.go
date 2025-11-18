@@ -8,6 +8,7 @@ import (
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	orderv1 "github.com/sonuudigital/microservices/gen/order/v1"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
+	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/order-service/internal/grpc/clients"
 	"github.com/sonuudigital/microservices/order-service/internal/grpc/order"
 	"github.com/sonuudigital/microservices/shared/logs"
@@ -25,6 +26,7 @@ const (
 	testCartID    = "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13"
 	testProductID = "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14"
 	testPaymentID = "f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a16"
+	testUserEmail = "test@email.com"
 
 	notImplementedError = "not implemented"
 )
@@ -33,8 +35,8 @@ type MockOrderRepository struct {
 	mock.Mock
 }
 
-func (m *MockOrderRepository) CreateOrder(ctx context.Context, userID string, totalAmount float64, products []*cartv1.CartProduct) (*orderv1.Order, error) {
-	args := m.Called(ctx, userID, totalAmount, products)
+func (m *MockOrderRepository) CreateOrder(ctx context.Context, userID, userEmail string, totalAmount float64, products []*cartv1.CartProduct) (*orderv1.Order, error) {
+	args := m.Called(ctx, userID, userEmail, totalAmount, products)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -87,6 +89,26 @@ func (m *MockPaymentClient) ProcessPayment(ctx context.Context, in *paymentv1.Pr
 	return args.Get(0).(*paymentv1.Payment), args.Error(1)
 }
 
+type MockUserClient struct {
+	mock.Mock
+}
+
+func (m *MockUserClient) CreateUser(ctx context.Context, in *userv1.CreateUserRequest, opts ...grpc.CallOption) (*userv1.User, error) {
+	panic(notImplementedError)
+}
+
+func (m *MockUserClient) GetUserByID(ctx context.Context, in *userv1.GetUserByIDRequest, opts ...grpc.CallOption) (*userv1.User, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*userv1.User), args.Error(1)
+}
+
+func (m *MockUserClient) AuthorizeUser(ctx context.Context, in *userv1.AuthorizeUserRequest, opts ...grpc.CallOption) (*userv1.User, error) {
+	panic(notImplementedError)
+}
+
 func TestCreateOrder(t *testing.T) {
 	req := &orderv1.CreateOrderRequest{
 		UserId: testUserID,
@@ -105,20 +127,23 @@ func TestCreateOrder(t *testing.T) {
 		mockRepo := new(MockOrderRepository)
 		mockCartClient := new(MockCartClient)
 		mockPaymentClient := new(MockPaymentClient)
+		mockUserClient := new(MockUserClient)
 
 		mockCartClient.On("GetCart", mock.Anything, &cartv1.GetCartRequest{UserId: testUserID}).Return(cartResponse, nil).Once()
+
+		mockUserClient.On("GetUserByID", mock.Anything, &userv1.GetUserByIDRequest{Id: testUserID}).Return(&userv1.User{Id: testUserID, Email: testUserEmail}, nil).Once()
+
+		expectedOrder := &orderv1.Order{Id: testOrderID, UserId: testUserID, TotalAmount: 100.50, Status: "CREATED"}
+		mockRepo.On("CreateOrder", mock.Anything, testUserID, testUserEmail, 100.50, cartProducts).Return(expectedOrder, nil).Once()
 
 		mockPaymentClient.On("ProcessPayment", mock.Anything, mock.MatchedBy(func(req *paymentv1.ProcessPaymentRequest) bool {
 			return req.UserId == testUserID && req.Amount == 100.50
 		})).Return(&paymentv1.Payment{Id: testPaymentID, Status: "COMPLETED"}, nil).Once()
 
-		expectedOrder := &orderv1.Order{Id: testOrderID, UserId: testUserID, TotalAmount: 100.50, Status: "CREATED"}
-		mockRepo.On("CreateOrder", mock.Anything, testUserID, 100.50, cartProducts).Return(expectedOrder, nil).Once()
-
 		server := order.New(
 			logs.NewSlogLogger(),
 			mockRepo,
-			&clients.Clients{CartServiceClient: mockCartClient, PaymentServiceClient: mockPaymentClient},
+			&clients.Clients{CartServiceClient: mockCartClient, PaymentServiceClient: mockPaymentClient, UserServiceClient: mockUserClient},
 		)
 
 		res, err := server.CreateOrder(context.Background(), req)
@@ -128,6 +153,7 @@ func TestCreateOrder(t *testing.T) {
 		assert.Equal(t, expectedOrder, res)
 		mockRepo.AssertExpectations(t)
 		mockCartClient.AssertExpectations(t)
+		mockUserClient.AssertExpectations(t)
 		mockPaymentClient.AssertExpectations(t)
 	})
 
@@ -135,11 +161,14 @@ func TestCreateOrder(t *testing.T) {
 		mockRepo := new(MockOrderRepository)
 		mockCartClient := new(MockCartClient)
 		mockPaymentClient := new(MockPaymentClient)
+		mockUserClient := new(MockUserClient)
 
 		mockCartClient.On("GetCart", mock.Anything, &cartv1.GetCartRequest{UserId: testUserID}).Return(cartResponse, nil).Once()
 
+		mockUserClient.On("GetUserByID", mock.Anything, &userv1.GetUserByIDRequest{Id: testUserID}).Return(&userv1.User{Id: testUserID, Email: testUserEmail}, nil).Once()
+
 		expectedOrder := &orderv1.Order{Id: testOrderID, UserId: testUserID, TotalAmount: 100.50, Status: "CREATED"}
-		mockRepo.On("CreateOrder", mock.Anything, testUserID, 100.50, cartProducts).Return(expectedOrder, nil).Once()
+		mockRepo.On("CreateOrder", mock.Anything, testUserID, testUserEmail, 100.50, cartProducts).Return(expectedOrder, nil).Once()
 
 		paymentErr := status.Error(codes.FailedPrecondition, "insufficient funds")
 		mockPaymentClient.On("ProcessPayment", mock.Anything, mock.MatchedBy(func(req *paymentv1.ProcessPaymentRequest) bool {
@@ -151,7 +180,7 @@ func TestCreateOrder(t *testing.T) {
 		server := order.New(
 			logs.NewSlogLogger(),
 			mockRepo,
-			&clients.Clients{CartServiceClient: mockCartClient, PaymentServiceClient: mockPaymentClient},
+			&clients.Clients{CartServiceClient: mockCartClient, PaymentServiceClient: mockPaymentClient, UserServiceClient: mockUserClient},
 		)
 
 		res, err := server.CreateOrder(context.Background(), req)
@@ -162,6 +191,7 @@ func TestCreateOrder(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, st.Code())
 		mockCartClient.AssertExpectations(t)
+		mockUserClient.AssertExpectations(t)
 		mockPaymentClient.AssertExpectations(t)
 		mockRepo.AssertExpectations(t)
 	})
@@ -170,11 +200,14 @@ func TestCreateOrder(t *testing.T) {
 		mockRepo := new(MockOrderRepository)
 		mockCartClient := new(MockCartClient)
 		mockPaymentClient := new(MockPaymentClient)
+		mockUserClient := new(MockUserClient)
 
 		mockCartClient.On("GetCart", mock.Anything, &cartv1.GetCartRequest{UserId: testUserID}).Return(cartResponse, nil).Once()
 
+		mockUserClient.On("GetUserByID", mock.Anything, &userv1.GetUserByIDRequest{Id: testUserID}).Return(&userv1.User{Id: testUserID, Email: testUserEmail}, nil).Once()
+
 		expectedOrder := &orderv1.Order{Id: testOrderID, UserId: testUserID, TotalAmount: 100.50, Status: "CREATED"}
-		mockRepo.On("CreateOrder", mock.Anything, testUserID, 100.50, cartProducts).Return(expectedOrder, nil).Once()
+		mockRepo.On("CreateOrder", mock.Anything, testUserID, testUserEmail, 100.50, cartProducts).Return(expectedOrder, nil).Once()
 
 		paymentErr := status.Error(codes.FailedPrecondition, "insufficient funds")
 		mockPaymentClient.On("ProcessPayment", mock.Anything, mock.MatchedBy(func(req *paymentv1.ProcessPaymentRequest) bool {
@@ -187,7 +220,7 @@ func TestCreateOrder(t *testing.T) {
 		server := order.New(
 			logs.NewSlogLogger(),
 			mockRepo,
-			&clients.Clients{CartServiceClient: mockCartClient, PaymentServiceClient: mockPaymentClient},
+			&clients.Clients{CartServiceClient: mockCartClient, PaymentServiceClient: mockPaymentClient, UserServiceClient: mockUserClient},
 		)
 
 		res, err := server.CreateOrder(context.Background(), req)
@@ -198,6 +231,7 @@ func TestCreateOrder(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, st.Code())
 		mockCartClient.AssertExpectations(t)
+		mockUserClient.AssertExpectations(t)
 		mockPaymentClient.AssertExpectations(t)
 		mockRepo.AssertExpectations(t)
 	})
@@ -206,16 +240,19 @@ func TestCreateOrder(t *testing.T) {
 		mockRepo := new(MockOrderRepository)
 		mockCartClient := new(MockCartClient)
 		mockPaymentClient := new(MockPaymentClient)
+		mockUserClient := new(MockUserClient)
 
 		mockCartClient.On("GetCart", mock.Anything, &cartv1.GetCartRequest{UserId: testUserID}).Return(cartResponse, nil).Once()
 
+		mockUserClient.On("GetUserByID", mock.Anything, &userv1.GetUserByIDRequest{Id: testUserID}).Return(&userv1.User{Id: testUserID, Email: testUserEmail}, nil).Once()
+
 		repoErr := errors.New("database transaction failed")
-		mockRepo.On("CreateOrder", mock.Anything, testUserID, 100.50, cartProducts).Return(nil, repoErr).Once()
+		mockRepo.On("CreateOrder", mock.Anything, testUserID, testUserEmail, 100.50, cartProducts).Return(nil, repoErr).Once()
 
 		server := order.New(
 			logs.NewSlogLogger(),
 			mockRepo,
-			&clients.Clients{CartServiceClient: mockCartClient, PaymentServiceClient: mockPaymentClient},
+			&clients.Clients{CartServiceClient: mockCartClient, PaymentServiceClient: mockPaymentClient, UserServiceClient: mockUserClient},
 		)
 
 		res, err := server.CreateOrder(context.Background(), req)
@@ -227,6 +264,7 @@ func TestCreateOrder(t *testing.T) {
 		assert.Equal(t, codes.Internal, st.Code())
 		mockRepo.AssertExpectations(t)
 		mockCartClient.AssertExpectations(t)
+		mockUserClient.AssertExpectations(t)
 		mockPaymentClient.AssertNotCalled(t, "ProcessPayment", mock.Anything, mock.Anything)
 	})
 

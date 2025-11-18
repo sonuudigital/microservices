@@ -6,6 +6,7 @@ import (
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	orderv1 "github.com/sonuudigital/microservices/gen/order/v1"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
+	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -25,7 +26,12 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 		return nil, err
 	}
 
-	gRPCOrder, err := s.repository.CreateOrder(ctx, req.UserId, cart.TotalPrice, cart.Products)
+	userEmail, err := s.getUserEmail(ctx, req.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	gRPCOrder, err := s.repository.CreateOrder(ctx, req.UserId, userEmail, cart.TotalPrice, cart.Products)
 	if err != nil {
 		s.logger.Error(
 			"failed to create order and outbox event",
@@ -73,6 +79,7 @@ func (s *Server) CreateOrder(ctx context.Context, req *orderv1.CreateOrderReques
 		"order created successfully with payment processed",
 		"orderId", gRPCOrder.Id,
 		"userId", gRPCOrder.UserId,
+		"userEmail", userEmail,
 		"paymentId", payment.Id,
 		"totalAmount", gRPCOrder.TotalAmount,
 	)
@@ -115,6 +122,33 @@ func (s *Server) getCart(ctx context.Context, userID string) (*cartv1.GetCartRes
 	)
 
 	return cart, nil
+}
+
+func (s *Server) getUserEmail(ctx context.Context, userID string) (string, error) {
+	s.logger.Debug("fetching user email", "userId", userID)
+
+	user, err := s.clients.UserServiceClient.GetUserByID(ctx, &userv1.GetUserByIDRequest{
+		Id: userID,
+	})
+	if err != nil {
+		st := status.Convert(err)
+		switch st.Code() {
+		case codes.NotFound:
+			return "", status.Errorf(codes.FailedPrecondition, "cannot create order: user not found %s", userID)
+		case codes.Unavailable, codes.DeadlineExceeded:
+			return "", status.Errorf(codes.Unavailable, "user service temporarily unavailable: %v", err)
+		default:
+			return "", status.Errorf(codes.Internal, "failed to get user: %v", err)
+		}
+	}
+
+	s.logger.Debug(
+		"fetched user email",
+		"userId", userID,
+		"email", user.Email,
+	)
+
+	return user.Email, nil
 }
 
 func (s *Server) processPayment(ctx context.Context, orderID, userID string, amount float64) (*paymentv1.Payment, error) {
