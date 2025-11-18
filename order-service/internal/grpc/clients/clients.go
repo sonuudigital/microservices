@@ -5,6 +5,7 @@ import (
 
 	cartv1 "github.com/sonuudigital/microservices/gen/cart/v1"
 	paymentv1 "github.com/sonuudigital/microservices/gen/payment/v1"
+	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -12,18 +13,21 @@ import (
 type clientsURL struct {
 	cartServiceURL    string
 	paymentServiceURL string
+	userServiceURL    string
 }
 
-func NewClienstURL(cartURL, paymentURL string) clientsURL {
+func NewClienstURL(cartURL, paymentURL, userURL string) clientsURL {
 	return clientsURL{
 		cartServiceURL:    cartURL,
 		paymentServiceURL: paymentURL,
+		userServiceURL:    userURL,
 	}
 }
 
 type Clients struct {
 	cartv1.CartServiceClient
 	paymentv1.PaymentServiceClient
+	userv1.UserServiceClient
 }
 
 func NewClients(urls clientsURL) (*Clients, error) {
@@ -39,8 +43,15 @@ func NewClients(urls clientsURL) (*Clients, error) {
 		return nil, err
 	}
 
+	userServiceClient, err := grpc.NewClient(urls.userServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		err := fmt.Errorf("failed to connect to user gRPC client: %w", err)
+		return nil, err
+	}
+
 	return &Clients{
 		CartServiceClient:    cartv1.NewCartServiceClient(cartServiceClient),
 		PaymentServiceClient: paymentv1.NewPaymentServiceClient(paymentServiceClient),
+		UserServiceClient:    userv1.NewUserServiceClient(userServiceClient),
 	}, nil
 }

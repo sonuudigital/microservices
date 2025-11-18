@@ -159,12 +159,15 @@ services:
       MIGRATIONS_DIR: /migrations
       LOG_LEVEL: ${LOG_LEVEL}
       CART_SERVICE_GRPC_URL: ${CART_SERVICE_GRPC_URL}
+      USER_SERVICE_GRPC_URL: ${USER_SERVICE_GRPC_URL}
       PAYMENT_SERVICE_GRPC_URL: ${PAYMENT_SERVICE_GRPC_URL}
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
     depends_on:
       order-db:
         condition: service_healthy
       cart-service:
+        condition: service_healthy
+      user-service:
         condition: service_healthy
       payment-service:
         condition: service_healthy

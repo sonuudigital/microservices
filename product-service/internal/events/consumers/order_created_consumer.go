@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -88,7 +89,7 @@ func (occ *OrderCreatedConsumer) handleOrderCreatedEvent(ctx context.Context, d 
 		return
 	}
 
-	go occ.invalidateCacheForUpdatedProducts(ctx, orderCreatedEvent.Products)
+	go occ.invalidateCacheForUpdatedProducts(orderCreatedEvent.Products)
 
 	occ.logger.Info(
 		"successfully updated stock for products in order",
@@ -160,7 +161,10 @@ func (occ *OrderCreatedConsumer) validateStockUpdate(event *events.OrderCreatedE
 	return true
 }
 
-func (occ *OrderCreatedConsumer) invalidateCacheForUpdatedProducts(ctx context.Context, products []events.OrderItem) {
+func (occ *OrderCreatedConsumer) invalidateCacheForUpdatedProducts(products []events.OrderItem) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	pipe := occ.redisClient.Pipeline()
 
 	productIDs := make([]string, len(products))

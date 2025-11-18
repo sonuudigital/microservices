@@ -10,7 +10,7 @@ import (
 )
 
 type OrderRepository interface {
-	CreateOrder(ctx context.Context, userID string, totalAmount float64, products []*cartv1.CartProduct) (*orderv1.Order, error)
+	CreateOrder(ctx context.Context, userID, userEmail string, totalAmount float64, products []*cartv1.CartProduct) (*orderv1.Order, error)
 	CancelOrder(ctx context.Context, orderID string) error
 }
 
