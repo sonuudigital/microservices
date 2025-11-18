@@ -12,6 +12,7 @@ The project follows a microservices architecture. Key components include:
 *   **Cart Service ([`cart-service`](cart-service)):** Manages shopping cart operations. It communicates with the Product Service via gRPC to get product details and uses its own PostgreSQL database.
 *   **Order Service ([`order-service`](order-service)):** Orchestrates the order creation process, communicating with the Cart, Product, and Payment services. It implements the Saga and Outbox patterns to ensure data consistency across services.
 *   **Payment Service ([`payment-service`](payment-service)):** Simulates payment processing for orders. It's an internal service called by the Order Service.
+*   **Notification Service ([`notification-service`](notification-service)):** Consumes events from RabbitMQ and sends email notifications to users. It uses MailHog for local email testing.
 *   **Shared ([`shared`](shared)):** A shared module containing common code for authentication, logging, and database connections.
 *   **Protobufs ([`protos`](protos)):** Contains all gRPC service definitions for the project.
 
@@ -48,9 +49,11 @@ This command builds and starts all services. For production, a `docker-compose.p
 *   Cart Service (gRPC): Internal (port 9083)
 *   Order Service (gRPC): Internal (port 9084)
 *   Payment Service (gRPC): Internal (port 9085)
+*   Notification Service: Internal (consumes events from RabbitMQ)
 *   PostgreSQL Databases: Separate instances for each service.
 *   pgAdmin: `http://localhost:5050`
 *   RabbitMQ: `http://localhost:15672`
+*   MailHog (SMTP Server): `http://localhost:8025`
 
 ## Development Conventions
 
