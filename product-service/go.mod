@@ -1,6 +1,6 @@
 module github.com/sonuudigital/microservices/product-service
 
-go 1.25.3
+go 1.25.4
 
 require (
 	github.com/go-redis/redismock/v9 v9.2.0
