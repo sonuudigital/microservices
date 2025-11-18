@@ -207,6 +207,29 @@ services:
       - services-network
       - payment-db-network
 
+  notification-service:
+    container_name: notification-service
+    hostname: notification-service
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      LOG_LEVEL: ${LOG_LEVEL}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    networks:
+      - rabbitmq-network
+      - mailhog-network
+
   user-db:
     image: postgres:18-alpine
     container_name: user-db
@@ -373,6 +396,17 @@ services:
       timeout: 5s
       retries: 5
 
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    hostname: mailhog
+    expose:
+      - "1025"
+    ports:
+      - "${MAILHOG_HTTP_PORT}:8025"
+    networks:
+      - mailhog-network
+
 networks:
   services-network:
   user-db-network:
@@ -382,6 +416,7 @@ networks:
   payment-db-network:
   redis-network:
   rabbitmq-network:
+  mailhog-network:
 
 volumes:
   user_db_data:
