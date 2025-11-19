@@ -1,5 +1,11 @@
 package events
 
+const (
+	ProductExchange          = "products.events"
+	ProductCreatedRoutingKey = "product.created"
+	ProductCreatedEventName  = ProductExchange + ":" + ProductCreatedRoutingKey
+)
+
 type Product struct {
 	ID            string `json:"id"`
 	CategoryID    string `json:"categoryId"`
