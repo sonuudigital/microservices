@@ -10,10 +10,6 @@ import (
 	"github.com/sonuudigital/microservices/shared/events"
 )
 
-const (
-	productCreatedEventName = "products_events#product.created"
-)
-
 type ProductRepository struct {
 	*repository.Queries
 	db *pgxpool.Pool
@@ -47,7 +43,7 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, arg repository.Cr
 
 	err = q.CreateOutboxEvent(ctx, repository.CreateOutboxEventParams{
 		AggregateID: product.ID,
-		EventName:   productCreatedEventName,
+		EventName:   events.ProductCreatedEventName,
 		Payload:     encodedProduct,
 	})
 	if err != nil {

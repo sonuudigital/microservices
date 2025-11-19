@@ -15,6 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	product_categoriesv1 "github.com/sonuudigital/microservices/gen/product-categories/v1"
 	productv1 "github.com/sonuudigital/microservices/gen/product/v1"
+	"github.com/sonuudigital/microservices/product-service/internal/events"
 	"github.com/sonuudigital/microservices/product-service/internal/events/consumers"
 	grpc_server "github.com/sonuudigital/microservices/product-service/internal/grpc"
 	"github.com/sonuudigital/microservices/product-service/internal/grpc/category"
@@ -57,31 +58,40 @@ func main() {
 	logger.Info("redis connected successfully")
 	defer redisClient.Close()
 
-	rabbitmq, err := initializeRabbitMQ(logger)
+	fanoutPublisher, rabbitmqClient, err := initializeRabbitMQClients(logger)
 	if err != nil {
-		logger.Error("failed to initialize RabbitMQ", "error", err)
+		logger.Error("failed to initialize RabbitMQ clients", "error", err)
 		os.Exit(1)
 	}
-	defer rabbitmq.Close()
+	defer fanoutPublisher.Close()
+	defer rabbitmqClient.Close()
 
-	initializeServicesAndWaitForShutdown(logger, rabbitmq, pgDb, redisClient)
+	delegatingPublisher := events.NewDelegatingPublisher(fanoutPublisher, rabbitmqClient)
+
+	initializeServicesAndWaitForShutdown(logger, fanoutPublisher, delegatingPublisher, pgDb, redisClient)
 }
 
-func initializeServicesAndWaitForShutdown(logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, pgDb *pgxpool.Pool, redisClient *redis.Client) {
+func initializeServicesAndWaitForShutdown(
+	logger logs.Logger,
+	fanoutPublisher *rabbitmq.RabbitMQ,
+	delegatingPublisher *events.DelegatingPublisher,
+	pgDb *pgxpool.Pool,
+	redisClient *redis.Client,
+) {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return startRabbitMQConsumer(gCtx, logger, rabbitmq, redisClient, repository.NewPostgreSQLOrderCreatedConsumerRepository(pgDb))
+		return startRabbitMQConsumer(gCtx, logger, fanoutPublisher, redisClient, repository.NewPostgreSQLOrderCreatedConsumerRepository(pgDb))
 	})
 
 	g.Go(func() error {
 		return startGRPCServer(gCtx, pgDb, redisClient, logger)
 	})
 
-	go startMessageRelayerWorker(gCtx, logger, rabbitmq, pgDb)
+	go startMessageRelayerWorker(gCtx, logger, delegatingPublisher, pgDb)
 
 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		logger.Error("application exited with error", "error", err)
@@ -128,7 +138,7 @@ func startGRPCServer(ctx context.Context, pgDb *pgxpool.Pool, redisClient *redis
 	return web.StartGRPCServerAndWaitForShutdown(ctx, grpcServer, lis, logger)
 }
 
-func startMessageRelayerWorker(ctx context.Context, logger logs.Logger, rabbitmq *rabbitmq.RabbitMQ, repo *pgxpool.Pool) {
+func startMessageRelayerWorker(ctx context.Context, logger logs.Logger, publisher worker.Publisher, repo *pgxpool.Pool) {
 	pollInterval, batchSize, err := getMessageRelayerConfigFromEnv()
 	if err != nil {
 		logger.Error("failed to get message relayer config from env", "error", err)
@@ -136,7 +146,7 @@ func startMessageRelayerWorker(ctx context.Context, logger logs.Logger, rabbitmq
 	}
 	worker.NewOutboxEventMessageRelayer(
 		logger,
-		rabbitmq,
+		publisher,
 		repo_postgres.NewOutboxEventMessageRelayerRepository(repo),
 		pollInterval,
 		batchSize,
@@ -176,18 +186,23 @@ func initializeRedisClient() (*redis.Client, error) {
 	return client, nil
 }
 
-func initializeRabbitMQ(logger logs.Logger) (*rabbitmq.RabbitMQ, error) {
+func initializeRabbitMQClients(logger logs.Logger) (*rabbitmq.RabbitMQ, *rabbitmq.Client, error) {
 	rabbitmqURL := os.Getenv("RABBITMQ_URL")
 	if rabbitmqURL == "" {
-		return nil, fmt.Errorf("RABBITMQ_URL is not set")
+		return nil, nil, fmt.Errorf("RABBITMQ_URL is not set")
 	}
 
-	rabbitmq, err := rabbitmq.NewConnection(logger, rabbitmqURL)
+	fanoutPublisher, err := rabbitmq.NewConnection(logger, rabbitmqURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to create fanout rabbitmq connection: %w", err)
 	}
 
-	return rabbitmq, nil
+	topicClient, err := rabbitmq.NewClient(logger, rabbitmqURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create topic rabbitmq client: %w", err)
+	}
+
+	return fanoutPublisher, topicClient, nil
 }
 
 func getMessageRelayerConfigFromEnv() (time.Duration, int32, error) {
