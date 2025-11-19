@@ -102,11 +102,11 @@ func startGRPCServer(ctx context.Context, pgDb *pgxpool.Pool, redisClient *redis
 		return fmt.Errorf("failed to listen for gRPC: %w", err)
 	}
 
-	queries := repository.New(pgDb)
+	productRepo := repo_postgres.NewProductRepository(pgDb)
 	grpcServer := grpc.NewServer()
 
-	categoryServer := category.New(logger, queries, redisClient)
-	productServer := grpc_server.NewServer(logger, queries, redisClient)
+	categoryServer := category.New(logger, productRepo, redisClient)
+	productServer := grpc_server.NewServer(logger, productRepo, redisClient)
 
 	product_categoriesv1.RegisterProductCategoriesServiceServer(grpcServer, categoryServer)
 	productv1.RegisterProductServiceServer(grpcServer, productServer)
