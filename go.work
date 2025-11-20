@@ -8,6 +8,7 @@ use (
 	./order-service
 	./payment-service
 	./product-service
+	./search-service
 	./shared
 	./tools/health-checker
 	./user-service
