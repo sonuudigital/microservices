@@ -43,5 +43,6 @@
 # End of https://www.toptal.com/developers/gitignore/api/go,visualstudiocode
 
 *.env
+.github
 GEMINI.*
 certs/private.pem

@@ -9,27 +9,27 @@ import (
 	"testing"
 	"time"
 
-	opensearchClient "github.com/sonuudigital/microservices/search-service/internal/opensearch"
+	"github.com/sonuudigital/microservices/search-service/internal/opensearch"
 )
 
 const unexpectedErrFmt = "unexpected error: %v"
 
 func TestNewClientValidation(t *testing.T) {
-	_, err := opensearchClient.NewClient([]string{}, "u", "p")
+	_, err := opensearch.NewClient([]string{}, "u", "p")
 	if err == nil {
 		t.Fatalf("expected error for empty addresses")
 	}
-	_, err = opensearchClient.NewClient([]string{"http://x"}, "", "p")
+	_, err = opensearch.NewClient([]string{"http://x"}, "", "p")
 	if err == nil {
 		t.Fatalf("expected error for empty username")
 	}
-	_, err = opensearchClient.NewClient([]string{"http://x"}, "u", "")
+	_, err = opensearch.NewClient([]string{"http://x"}, "u", "")
 	if err == nil {
 		t.Fatalf("expected error for empty password")
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
 	defer srv.Close()
-	c, err := opensearchClient.NewClient([]string{srv.URL}, "u", "p")
+	c, err := opensearch.NewClient([]string{srv.URL}, "u", "p")
 	if err != nil {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
@@ -47,7 +47,7 @@ func TestClientIndexSuccess(t *testing.T) {
 		w.Write([]byte(`{"result":"created"}`))
 	}))
 	defer srv.Close()
-	c, err := opensearchClient.NewClient([]string{srv.URL}, "u", "p")
+	c, err := opensearch.NewClient([]string{srv.URL}, "u", "p")
 	if err != nil {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
@@ -70,7 +70,7 @@ func TestClientIndexSuccess(t *testing.T) {
 func TestClientIndexServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(500) }))
 	defer srv.Close()
-	c, err := opensearchClient.NewClient([]string{srv.URL}, "u", "p")
+	c, err := opensearch.NewClient([]string{srv.URL}, "u", "p")
 	if err != nil {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
@@ -87,7 +87,7 @@ func TestClientIndexNetworkError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
 	url := srv.URL
 	srv.Close()
-	c, err := opensearchClient.NewClient([]string{url}, "u", "p")
+	c, err := opensearch.NewClient([]string{url}, "u", "p")
 	if err != nil {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
