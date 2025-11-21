@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sonuudigital/microservices/product-service/internal/repository"
 	"github.com/sonuudigital/microservices/shared/events"
@@ -23,6 +24,63 @@ func NewProductRepository(db *pgxpool.Pool) *ProductRepository {
 }
 
 func (r *ProductRepository) CreateProduct(ctx context.Context, arg repository.CreateProductParams) (repository.Product, error) {
+	return r.withProductTx(ctx, func(q *repository.Queries) (repository.Product, error) {
+		product, err := q.CreateProduct(ctx, arg)
+		if err != nil {
+			return repository.Product{}, err
+		}
+
+		payload, err := r.productToPayload(product)
+		if err != nil {
+			return repository.Product{}, err
+		}
+
+		if err := r.addOutboxEvent(ctx, q, product.ID, events.ProductCreatedEventName, payload); err != nil {
+			return repository.Product{}, err
+		}
+
+		return product, nil
+	})
+}
+
+func (r *ProductRepository) UpdateProduct(ctx context.Context, arg repository.UpdateProductParams) (repository.Product, error) {
+	return r.withProductTx(ctx, func(q *repository.Queries) (repository.Product, error) {
+		product, err := q.UpdateProduct(ctx, arg)
+		if err != nil {
+			return repository.Product{}, err
+		}
+
+		payload, err := r.productToPayload(product)
+		if err != nil {
+			return repository.Product{}, err
+		}
+
+		if err := r.addOutboxEvent(ctx, q, product.ID, events.ProductUpdatedEventName, payload); err != nil {
+			return repository.Product{}, err
+		}
+
+		return product, nil
+	})
+}
+
+func (r *ProductRepository) DeleteProduct(ctx context.Context, id pgtype.UUID) error {
+	return r.withTx(ctx, func(q *repository.Queries) error {
+		if err := q.DeleteProduct(ctx, id); err != nil {
+			return err
+		}
+
+		payload, err := json.Marshal(events.Product{
+			ID: id.String(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to marshal delete product payload: %w", err)
+		}
+
+		return r.addOutboxEvent(ctx, q, id, events.ProductDeletedEventName, payload)
+	})
+}
+
+func (r *ProductRepository) withProductTx(ctx context.Context, fn func(q *repository.Queries) (repository.Product, error)) (repository.Product, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return repository.Product{}, err
@@ -31,29 +89,43 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, arg repository.Cr
 
 	q := r.WithTx(tx)
 
-	product, err := q.CreateProduct(ctx, arg)
+	product, err := fn(q)
 	if err != nil {
 		return repository.Product{}, err
 	}
 
-	encodedProduct, err := r.marshalProductToProductEvent(product)
-	if err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return repository.Product{}, err
 	}
 
-	err = q.CreateOutboxEvent(ctx, repository.CreateOutboxEventParams{
-		AggregateID: product.ID,
-		EventName:   events.ProductCreatedEventName,
-		Payload:     encodedProduct,
-	})
-	if err != nil {
-		return repository.Product{}, err
-	}
-
-	return product, tx.Commit(ctx)
+	return product, nil
 }
 
-func (r *ProductRepository) marshalProductToProductEvent(p repository.Product) ([]byte, error) {
+func (r *ProductRepository) withTx(ctx context.Context, fn func(q *repository.Queries) error) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	q := r.WithTx(tx)
+
+	if err := fn(q); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *ProductRepository) addOutboxEvent(ctx context.Context, q *repository.Queries, aggregateID pgtype.UUID, eventName string, payload []byte) error {
+	return q.CreateOutboxEvent(ctx, repository.CreateOutboxEventParams{
+		AggregateID: aggregateID,
+		EventName:   eventName,
+		Payload:     payload,
+	})
+}
+
+func (r *ProductRepository) productToPayload(p repository.Product) ([]byte, error) {
 	priceJSON, err := p.Price.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal price: %w", err)
