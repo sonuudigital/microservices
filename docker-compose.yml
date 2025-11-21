@@ -233,6 +233,28 @@ services:
       - rabbitmq-network
       - mailhog-network
 
+  search-service:
+    container_name: search-service
+    hostname: search-service
+    build:
+      context: .
+      dockerfile: search-service/Dockerfile
+    environment:
+      OPENSEARCH_PRODUCT_INDEX: ${OPENSEARCH_PRODUCT_INDEX}
+      OPENSEARCH_ADDRESS: http://opensearch:9200
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL}
+    depends_on:
+      opensearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - opensearch-network
+      - rabbitmq-network
+
   user-db:
     image: postgres:18-alpine
     container_name: user-db
@@ -410,6 +432,34 @@ services:
     networks:
       - mailhog-network
 
+  opensearch:
+    image: opensearchproject/opensearch:3.3.2
+    container_name: opensearch
+    hostname: opensearch
+    environment:
+      OPENSEARCH_JAVA_OPTS: "-Xms1g -Xmx1g"
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      bootstrap.memory_lock: "true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    ports:
+      - "${OPENSEARCH_PORT}:9200"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:9200/_cluster/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - opensearch-network
+
 networks:
   services-network:
   user-db-network:
@@ -420,6 +470,7 @@ networks:
   redis-network:
   rabbitmq-network:
   mailhog-network:
+  opensearch-network:
 
 volumes:
   user_db_data:
@@ -430,3 +481,4 @@ volumes:
   redis_data:
   rabbitmq_data:
   pgadmin_data:
+  opensearch_data:

@@ -16,6 +16,7 @@ COPY product-service/go.mod product-service/go.sum ./product-service/
 COPY shared/go.mod shared/go.sum ./shared/
 COPY tools/health-checker/go.mod ./tools/health-checker/
 COPY user-service/go.mod user-service/go.sum ./user-service/
+COPY search-service/go.mod search-service/go.sum ./search-service/
 
 RUN --mount=type=cache,target=/go/pkg/mod go work sync
 
