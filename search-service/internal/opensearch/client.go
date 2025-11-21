@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/opensearch-project/opensearch-go/v2"
@@ -63,6 +64,20 @@ func (c *Client) Delete(ctx context.Context, indexName string, documentID string
 	res, err := req.Do(ctx, c.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute delete request: %w", err)
+	}
+
+	return res, nil
+}
+
+func (c *Client) Search(ctx context.Context, indexName string, body io.Reader) (*opensearchapi.Response, error) {
+	req := opensearchapi.SearchRequest{
+		Index: []string{indexName},
+		Body:  body,
+	}
+
+	res, err := req.Do(ctx, c.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute search request: %w", err)
 	}
 
 	return res, nil
