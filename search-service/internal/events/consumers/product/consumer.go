@@ -47,7 +47,7 @@ func (p *ProductEventsConsumer) Start(ctx context.Context) error {
 		ExchangeType: rabbitmq.ExchangeTopic,
 		QueueName:    "search_product_events_queue",
 		ConsumerTag:  "search_product_events_indexer_" + unixTimeStr,
-		BindingKey:   events.ProductWaildCardRoutingKey,
+		BindingKey:   events.ProductWildcardRoutingKey,
 		Handler:      p.handleProductCreatedEvent,
 	})
 }

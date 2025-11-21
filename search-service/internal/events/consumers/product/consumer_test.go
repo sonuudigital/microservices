@@ -108,7 +108,7 @@ func TestProductEventsConsumerStart(t *testing.T) {
 		Exchange:     events.ProductExchangeName,
 		ExchangeType: rabbitmq.ExchangeTopic,
 		QueueName:    "search_product_events_queue",
-		BindingKey:   events.ProductWaildCardRoutingKey,
+		BindingKey:   events.ProductWildcardRoutingKey,
 		Handler:      consumer.handleProductCreatedEvent,
 	}
 

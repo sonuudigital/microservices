@@ -1,12 +1,14 @@
 package events
 
 const (
-	ProductExchangeName        = "products.events"
-	ProductCreatedRoutingKey   = "product.created"
-	ProductUpdatedRoutingKey   = "product.updated"
-	ProductDeletedRoutingKey   = "product.deleted"
-	ProductWaildCardRoutingKey = "product.#"
-	ProductCreatedEventName    = ProductExchangeName + ":" + ProductCreatedRoutingKey
+	ProductExchangeName       = "products.events"
+	ProductCreatedRoutingKey  = "product.created"
+	ProductUpdatedRoutingKey  = "product.updated"
+	ProductDeletedRoutingKey  = "product.deleted"
+	ProductWildcardRoutingKey = "product.#"
+	ProductCreatedEventName   = ProductExchangeName + ":" + ProductCreatedRoutingKey
+	ProductUpdatedEventName   = ProductExchangeName + ":" + ProductUpdatedRoutingKey
+	ProductDeletedEventName   = ProductExchangeName + ":" + ProductDeletedRoutingKey
 )
 
 type Product struct {
