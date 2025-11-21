@@ -17,27 +17,28 @@ type Subscriber interface {
 	Subscribe(ctx context.Context, opts rabbitmq.SubscribeOptions) error
 }
 
-type Indexser interface {
+type DocumentStore interface {
 	Index(ctx context.Context, indexName string, documentID string, body []byte) (*opensearchapi.Response, error)
+	Delete(ctx context.Context, indexName string, documentID string) (*opensearchapi.Response, error)
 }
 
-type ProductCreatedEventConsumer struct {
+type ProductEventsConsumer struct {
 	logger          logs.Logger
 	subscriber      Subscriber
-	indexser        Indexser
+	indexer         DocumentStore
 	opensearchIndex string
 }
 
-func NewProductCreatedEventConsumer(logger logs.Logger, subscriber Subscriber, indexser Indexser, index string) *ProductCreatedEventConsumer {
-	return &ProductCreatedEventConsumer{
+func NewProductEventsConsumer(logger logs.Logger, subscriber Subscriber, indexer DocumentStore, index string) *ProductEventsConsumer {
+	return &ProductEventsConsumer{
 		logger:          logger,
 		subscriber:      subscriber,
-		indexser:        indexser,
+		indexer:         indexer,
 		opensearchIndex: index,
 	}
 }
 
-func (p *ProductCreatedEventConsumer) Start(ctx context.Context) error {
+func (p *ProductEventsConsumer) Start(ctx context.Context) error {
 	unixTime := time.Now().Unix()
 	unixTimeStr := strconv.Itoa(int(unixTime))
 
@@ -51,7 +52,7 @@ func (p *ProductCreatedEventConsumer) Start(ctx context.Context) error {
 	})
 }
 
-func (p *ProductCreatedEventConsumer) handleProductCreatedEvent(ctx context.Context, d amqp091.Delivery) {
+func (p *ProductEventsConsumer) handleProductCreatedEvent(ctx context.Context, d amqp091.Delivery) {
 	var productEvent events.Product
 	if err := json.Unmarshal(d.Body, &productEvent); err != nil {
 		p.logger.Error("failed to unmarshal product event", "error", err)
@@ -59,7 +60,7 @@ func (p *ProductCreatedEventConsumer) handleProductCreatedEvent(ctx context.Cont
 		return
 	}
 
-	p.logger.Info("product event received", "productId", productEvent.ID)
+	p.logger.Info("product event received", "routingKey", d.RoutingKey, "productId", productEvent.ID)
 
 	body, err := json.Marshal(productEvent)
 	if err != nil {
@@ -68,7 +69,16 @@ func (p *ProductCreatedEventConsumer) handleProductCreatedEvent(ctx context.Cont
 		return
 	}
 
-	res, err := p.indexser.Index(
+	if d.RoutingKey != events.ProductDeletedRoutingKey {
+		p.indexProduct(ctx, productEvent, body, d)
+	} else {
+		p.deleteProduct(ctx, productEvent, d)
+	}
+
+}
+
+func (p *ProductEventsConsumer) indexProduct(ctx context.Context, productEvent events.Product, body []byte, d amqp091.Delivery) {
+	res, err := p.indexer.Index(
 		ctx,
 		p.opensearchIndex,
 		productEvent.ID,
@@ -86,6 +96,28 @@ func (p *ProductCreatedEventConsumer) handleProductCreatedEvent(ctx context.Cont
 		return
 	}
 
-	p.logger.Info("product indexed successfully", "productId", productEvent.ID, "opensearchStatus", res.Status())
+	p.logger.Info("product indexed successfully", "index", p.opensearchIndex, "productId", productEvent.ID, "opensearchStatus", res.Status())
+	d.Ack(false)
+}
+
+func (p *ProductEventsConsumer) deleteProduct(ctx context.Context, productEvent events.Product, d amqp091.Delivery) {
+	res, err := p.indexer.Delete(
+		ctx,
+		p.opensearchIndex,
+		productEvent.ID,
+	)
+	if err != nil {
+		p.logger.Error("failed to delete document in opensearch", "error", err, "productId", productEvent.ID)
+		d.Nack(false, true)
+		return
+	}
+
+	if res.IsError() {
+		p.logger.Error("opensearch returned an error during deletion", "status", res.Status(), "productId", productEvent.ID)
+		d.Nack(false, true)
+		return
+	}
+
+	p.logger.Info("product deleted successfully", "index", p.opensearchIndex, "productId", productEvent.ID, "opensearchStatus", res.Status())
 	d.Ack(false)
 }

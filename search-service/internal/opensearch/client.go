@@ -52,3 +52,18 @@ func (c *Client) Index(ctx context.Context, indexName string, documentID string,
 
 	return res, nil
 }
+
+func (c *Client) Delete(ctx context.Context, indexName string, documentID string) (*opensearchapi.Response, error) {
+	req := opensearchapi.DeleteRequest{
+		Index:      indexName,
+		DocumentID: documentID,
+		Refresh:    "true",
+	}
+
+	res, err := req.Do(ctx, c.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute delete request: %w", err)
+	}
+
+	return res, nil
+}

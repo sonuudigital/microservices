@@ -46,7 +46,7 @@ func main() {
 	defer stop()
 
 	go product.
-		NewProductCreatedEventConsumer(logger, rabbitmqClient, opensearchClient, opensearchProductIndex).
+		NewProductEventsConsumer(logger, rabbitmqClient, opensearchClient, opensearchProductIndex).
 		Start(ctx)
 
 	<-ctx.Done()

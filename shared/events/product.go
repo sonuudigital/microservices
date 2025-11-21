@@ -3,6 +3,8 @@ package events
 const (
 	ProductExchangeName        = "products.events"
 	ProductCreatedRoutingKey   = "product.created"
+	ProductUpdatedRoutingKey   = "product.updated"
+	ProductDeletedRoutingKey   = "product.deleted"
 	ProductWaildCardRoutingKey = "product.#"
 	ProductCreatedEventName    = ProductExchangeName + ":" + ProductCreatedRoutingKey
 )

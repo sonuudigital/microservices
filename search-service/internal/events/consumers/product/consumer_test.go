@@ -30,17 +30,15 @@ func (m *MockSubscriber) Subscribe(ctx context.Context, opts rabbitmq.SubscribeO
 	return args.Error(0)
 }
 
-type MockIndexer struct {
+type MockDocumentStore struct {
 	mock.Mock
 }
 
-func (m *MockIndexer) Index(ctx context.Context, indexName string, documentID string, body []byte) (*opensearchapi.Response, error) {
+func (m *MockDocumentStore) Index(ctx context.Context, indexName string, documentID string, body []byte) (*opensearchapi.Response, error) {
 	args := m.Called(ctx, indexName, documentID, body)
-
 	if args.Error(1) != nil {
 		return nil, args.Error(1)
 	}
-
 	if args.Get(0) != nil {
 		behavior := args.String(0)
 		switch behavior {
@@ -50,7 +48,23 @@ func (m *MockIndexer) Index(ctx context.Context, indexName string, documentID st
 			return createMockResponse(false), nil
 		}
 	}
+	return createMockResponse(false), nil
+}
 
+func (m *MockDocumentStore) Delete(ctx context.Context, indexName string, documentID string) (*opensearchapi.Response, error) {
+	args := m.Called(ctx, indexName, documentID)
+	if args.Error(1) != nil {
+		return nil, args.Error(1)
+	}
+	if args.Get(0) != nil {
+		behavior := args.String(0)
+		switch behavior {
+		case "error_response":
+			return createMockResponse(true), nil
+		case "success":
+			return createMockResponse(false), nil
+		}
+	}
 	return createMockResponse(false), nil
 }
 
@@ -67,28 +81,28 @@ func createMockResponse(isError bool) *opensearchapi.Response {
 	}
 }
 
-func TestNewProductCreatedEventConsumer(t *testing.T) {
+func TestNewProductEventsConsumer(t *testing.T) {
 	logger := logs.NewSlogLogger()
 	mockSubscriber := new(MockSubscriber)
-	mockIndexer := new(MockIndexer)
+	mockIndexer := new(MockDocumentStore)
 	index := "products"
 
-	consumer := NewProductCreatedEventConsumer(logger, mockSubscriber, mockIndexer, index)
+	consumer := NewProductEventsConsumer(logger, mockSubscriber, mockIndexer, index)
 
 	assert.NotNil(t, consumer)
 	assert.Equal(t, logger, consumer.logger)
 	assert.Equal(t, mockSubscriber, consumer.subscriber)
-	assert.Equal(t, mockIndexer, consumer.indexser)
+	assert.Equal(t, mockIndexer, consumer.indexer)
 	assert.Equal(t, index, consumer.opensearchIndex)
 }
 
-func TestProductCreatedEventConsumerStart(t *testing.T) {
+func TestProductEventsConsumerStart(t *testing.T) {
 	logger := logs.NewSlogLogger()
 	mockSubscriber := new(MockSubscriber)
-	mockIndexer := new(MockIndexer)
+	mockIndexer := new(MockDocumentStore)
 	index := "products"
 
-	consumer := NewProductCreatedEventConsumer(logger, mockSubscriber, mockIndexer, index)
+	consumer := NewProductEventsConsumer(logger, mockSubscriber, mockIndexer, index)
 
 	expectedOpts := rabbitmq.SubscribeOptions{
 		Exchange:     events.ProductExchangeName,
@@ -125,13 +139,13 @@ func TestProductCreatedEventConsumerStart(t *testing.T) {
 	})
 }
 
-func TestProductCreatedEventConsumerHandleProductCreatedEvent(t *testing.T) {
+func TestProductEventsConsumerHandleProductEvent(t *testing.T) {
 	logger := logs.NewSlogLogger()
 	mockSubscriber := new(MockSubscriber)
-	mockIndexer := new(MockIndexer)
+	mockIndexer := new(MockDocumentStore)
 	index := "products"
 
-	consumer := NewProductCreatedEventConsumer(logger, mockSubscriber, mockIndexer, index)
+	consumer := NewProductEventsConsumer(logger, mockSubscriber, mockIndexer, index)
 
 	testProduct := events.Product{
 		ID:          "product-123",
@@ -141,7 +155,7 @@ func TestProductCreatedEventConsumerHandleProductCreatedEvent(t *testing.T) {
 		Price:       "99.99",
 	}
 
-	t.Run("Success", func(t *testing.T) {
+	t.Run("IndexSuccess", func(t *testing.T) {
 		productJSON := `{
 			"id": "product-123",
 			"categoryId": "category-456",
@@ -168,7 +182,7 @@ func TestProductCreatedEventConsumerHandleProductCreatedEvent(t *testing.T) {
 		mockIndexer.AssertNotCalled(t, "Index")
 	})
 
-	t.Run("IndexerError", func(t *testing.T) {
+	t.Run("IndexError", func(t *testing.T) {
 		productJSON := `{
 			"id": "product-123",
 			"categoryId": "category-456",
@@ -188,7 +202,7 @@ func TestProductCreatedEventConsumerHandleProductCreatedEvent(t *testing.T) {
 		mockIndexer.AssertExpectations(t)
 	})
 
-	t.Run("OpenSearchResponseError", func(t *testing.T) {
+	t.Run("IndexResponseError", func(t *testing.T) {
 		productJSON := `{
 			"id": "product-123",
 			"categoryId": "category-456",
@@ -222,5 +236,54 @@ func TestProductCreatedEventConsumerHandleProductCreatedEvent(t *testing.T) {
 		consumer.handleProductCreatedEvent(context.Background(), delivery)
 
 		mockIndexer.AssertExpectations(t)
+	})
+
+	t.Run("DeleteSuccess", func(t *testing.T) {
+		productJSON := `{
+			"id": "product-123",
+			"categoryId": "category-456",
+			"name": "Test Product",
+			"description": "A test product",
+			"price": "99.99",
+			"stockQuantity": 10
+		}`
+		mockIndexer.On("Delete", mock.Anything, index, testProduct.ID).Return("success", nil).Once()
+		delivery := amqp091.Delivery{Body: []byte(productJSON), RoutingKey: events.ProductDeletedRoutingKey}
+		consumer.handleProductCreatedEvent(context.Background(), delivery)
+		mockIndexer.AssertExpectations(t)
+		mockIndexer.AssertNotCalled(t, "Index")
+	})
+
+	t.Run("DeleteError", func(t *testing.T) {
+		productJSON := `{
+			"id": "product-123",
+			"categoryId": "category-456",
+			"name": "Test Product",
+			"description": "A test product",
+			"price": "99.99",
+			"stockQuantity": 10
+		}`
+		deleteErr := errors.New("delete failed")
+		mockIndexer.On("Delete", mock.Anything, index, testProduct.ID).Return(nil, deleteErr).Once()
+		delivery := amqp091.Delivery{Body: []byte(productJSON), RoutingKey: events.ProductDeletedRoutingKey}
+		consumer.handleProductCreatedEvent(context.Background(), delivery)
+		mockIndexer.AssertExpectations(t)
+		mockIndexer.AssertNotCalled(t, "Index")
+	})
+
+	t.Run("DeleteResponseError", func(t *testing.T) {
+		productJSON := `{
+			"id": "product-123",
+			"categoryId": "category-456",
+			"name": "Test Product",
+			"description": "A test product",
+			"price": "99.99",
+			"stockQuantity": 10
+		}`
+		mockIndexer.On("Delete", mock.Anything, index, testProduct.ID).Return("error_response", nil).Once()
+		delivery := amqp091.Delivery{Body: []byte(productJSON), RoutingKey: events.ProductDeletedRoutingKey}
+		consumer.handleProductCreatedEvent(context.Background(), delivery)
+		mockIndexer.AssertExpectations(t)
+		mockIndexer.AssertNotCalled(t, "Index")
 	})
 }
