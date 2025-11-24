@@ -94,7 +94,7 @@ func TestRouterServeHTTPSearchProductEndpoint(t *testing.T) {
 	}{
 		{
 			name:          "SearchProductCalled",
-			requestPath:   "/api/products/search",
+			requestPath:   "/api/search/products",
 			requestMethod: http.MethodGet,
 			setupMock: func(m *MockProductHandler) {
 				m.On("SearchProduct", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -106,7 +106,7 @@ func TestRouterServeHTTPSearchProductEndpoint(t *testing.T) {
 		},
 		{
 			name:          "SearchProductWithQueryParams",
-			requestPath:   "/api/products/search?q=laptop",
+			requestPath:   "/api/search/products?q=laptop",
 			requestMethod: http.MethodGet,
 			setupMock: func(m *MockProductHandler) {
 				m.On("SearchProduct", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/go-redis/redis_rate/v10"
 	"github.com/redis/go-redis/v9"
 	"github.com/sonuudigital/microservices/api-gateway/internal/clients"
+	"github.com/sonuudigital/microservices/api-gateway/internal/handlers/search"
 	"github.com/sonuudigital/microservices/api-gateway/internal/middlewares"
 	"github.com/sonuudigital/microservices/api-gateway/internal/router"
 	"github.com/sonuudigital/microservices/shared/auth"
@@ -47,7 +49,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler, err := router.New(logger, jwtManager, rateLimiterMiddleware, clients)
+	searchServiceURL, err := url.Parse(os.Getenv("SEARCH_SERVICE_URL"))
+	if err != nil {
+		logger.Error("failed to parse search service url", "error", err.Error())
+		os.Exit(1)
+	}
+
+	searchHandler, err := search.NewSearchHandler(searchServiceURL)
+	if err != nil {
+		logger.Error("failed to create search handler", "error", err)
+		os.Exit(1)
+	}
+
+	handler, err := router.New(logger, jwtManager, rateLimiterMiddleware, clients, searchHandler)
 	if err != nil {
 		logger.Error("failed to configure routes", "error", err)
 		os.Exit(1)
@@ -70,6 +84,7 @@ func verifyEnvironmentServiceURLs(logger logs.Logger) bool {
 		"PRODUCT_SERVICE_GRPC_URL",
 		"CART_SERVICE_GRPC_URL",
 		"ORDER_SERVICE_GRPC_URL",
+		"SEARCH_SERVICE_URL",
 		"REDIS_URL",
 	}
 
