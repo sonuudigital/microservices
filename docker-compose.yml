@@ -240,6 +240,7 @@ services:
       context: .
       dockerfile: search-service/Dockerfile
     environment:
+      PORT: ${SEARCH_SERVICE_PORT}
       OPENSEARCH_PRODUCT_INDEX: ${OPENSEARCH_PRODUCT_INDEX}
       OPENSEARCH_ADDRESS: http://opensearch:9200
       OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME}
