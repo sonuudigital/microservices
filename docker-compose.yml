@@ -16,6 +16,7 @@ services:
       PRODUCT_SERVICE_GRPC_URL: ${PRODUCT_SERVICE_GRPC_URL}
       CART_SERVICE_GRPC_URL: ${CART_SERVICE_GRPC_URL}
       ORDER_SERVICE_GRPC_URL: ${ORDER_SERVICE_GRPC_URL}
+      SEARCH_SERVICE_URL: ${SEARCH_SERVICE_URL}
       LOG_LEVEL: ${LOG_LEVEL}
       JWT_PRIVATE_KEY_PATH: /certs/private.pem
       JWT_PUBLIC_KEY_PATH: /certs/public.pem
@@ -255,6 +256,7 @@ services:
     networks:
       - opensearch-network
       - rabbitmq-network
+      - services-network
 
   user-db:
     image: postgres:18-alpine

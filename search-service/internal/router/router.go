@@ -48,5 +48,5 @@ func (r *Router) setupRoutes() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("search service is healthy"))
 	})
-	r.mux.HandleFunc("/api/products/search", r.productHandler.SearchProduct)
+	r.mux.HandleFunc("/api/search/products", r.productHandler.SearchProduct)
 }

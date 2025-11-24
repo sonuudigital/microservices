@@ -12,7 +12,7 @@ import (
 
 type authMiddleware func(http.Handler) http.Handler
 
-func New(logger logs.Logger, jwtManager *auth.JWTManager, rateLimiter *middlewares.RateLimiterMiddleware, clients *clients.GRPCClient) (http.Handler, error) {
+func New(logger logs.Logger, jwtManager *auth.JWTManager, rateLimiter *middlewares.RateLimiterMiddleware, clients *clients.GRPCClient, searchHandler http.Handler) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +33,7 @@ func New(logger logs.Logger, jwtManager *auth.JWTManager, rateLimiter *middlewar
 	configProductCategoriesRoutes(mux, productCategoriesHandler, authMw)
 	configCartRoutes(mux, cartHandler, authMw)
 	configOrderRoutes(mux, orderHandler, authMw)
+	configSearchRoutes(mux, searchHandler)
 
 	var handler http.Handler = mux
 	handler = rateLimiter.Middleware(handler)
@@ -72,4 +73,8 @@ func configCartRoutes(mux *http.ServeMux, cartHandler *handlers.CartHandler, aut
 
 func configOrderRoutes(mux *http.ServeMux, orderHandler *handlers.OrderHandler, authMiddleware authMiddleware) {
 	mux.Handle("POST /api/orders", authMiddleware(http.HandlerFunc(orderHandler.CreateOrderHandler)))
+}
+
+func configSearchRoutes(mux *http.ServeMux, searchHandler http.Handler) {
+	mux.Handle("GET /api/search/products", searchHandler)
 }
