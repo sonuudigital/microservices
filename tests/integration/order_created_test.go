@@ -1,4 +1,4 @@
-package integration_test
+package integration
 
 import (
 	"bytes"
@@ -13,34 +13,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	apiOrders     = "%s/api/orders"
-	sleepDuration = 6 * time.Second
-)
-
-type Order struct {
-	ID          string  `json:"id"`
-	UserID      string  `json:"userId"`
-	TotalAmount float64 `json:"totalAmount"`
-	Status      string  `json:"status"`
-	CreatedAt   string  `json:"createdAt"`
-}
-
 func TestCreateOrderSuccess(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	apiGatewayURL := os.Getenv(apiGatewayURLKey)
+	apiGatewayURL := os.Getenv(ApiGatewayURLKey)
 
-	_, authToken := registerAndLogin(require)
+	_, authToken := RegisterAndLogin(require)
 	require.NotEmpty(authToken)
 
-	product1 := createProduct(require, apiGatewayURL, authToken, "Test Product Order 1", 100.50, 50)
-	product2 := createProduct(require, apiGatewayURL, authToken, "Test Product Order 2", 250.75, 30)
+	product1 := CreateProduct(require, apiGatewayURL, authToken, "Test Product Order 1", 100.50, 50)
+	product2 := CreateProduct(require, apiGatewayURL, authToken, "Test Product Order 2", 250.75, 30)
 
 	t.Run("Verify Products Exist", func(t *testing.T) {
-		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product1.ID), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product1.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -54,9 +41,9 @@ func TestCreateOrderSuccess(t *testing.T) {
 		require.NoError(err)
 		t.Logf("Product 1: ID=%s, Name=%s, Stock=%d", p1.ID, p1.Name, p1.StockQuantity)
 
-		req, err = http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product2.ID), nil)
+		req, err = http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product2.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err = client.Do(req)
 		require.NoError(err)
@@ -79,10 +66,10 @@ func TestCreateOrderSuccess(t *testing.T) {
 		body, err := json.Marshal(addProductReq)
 		require.NoError(err)
 
-		req, err := http.NewRequest("POST", fmt.Sprintf(apiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
+		req, err := http.NewRequest("POST", fmt.Sprintf(ApiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
-		req.Header.Set(contentTypeHeader, contentTypeJSON)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
+		req.Header.Set(ContentTypeHeader, ContentTypeJSON)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -99,10 +86,10 @@ func TestCreateOrderSuccess(t *testing.T) {
 		body, err = json.Marshal(addProductReq)
 		require.NoError(err)
 
-		req, err = http.NewRequest("POST", fmt.Sprintf(apiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
+		req, err = http.NewRequest("POST", fmt.Sprintf(ApiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
-		req.Header.Set(contentTypeHeader, contentTypeJSON)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
+		req.Header.Set(ContentTypeHeader, ContentTypeJSON)
 
 		resp, err = client.Do(req)
 		require.NoError(err)
@@ -113,9 +100,9 @@ func TestCreateOrderSuccess(t *testing.T) {
 
 	var createdOrder Order
 	t.Run("Create Order", func(t *testing.T) {
-		req, err := http.NewRequest("POST", fmt.Sprintf(apiOrders, apiGatewayURL), nil)
+		req, err := http.NewRequest("POST", fmt.Sprintf(ApiOrders, apiGatewayURL), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -134,11 +121,11 @@ func TestCreateOrderSuccess(t *testing.T) {
 	})
 
 	t.Run("Verify Cart is Cleared", func(t *testing.T) {
-		time.Sleep(sleepDuration)
+		time.Sleep(SleepDuration)
 
-		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf(ApiCarts, apiGatewayURL), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -155,11 +142,11 @@ func TestCreateOrderSuccess(t *testing.T) {
 	})
 
 	t.Run("Verify Stock is Updated", func(t *testing.T) {
-		time.Sleep(sleepDuration)
+		time.Sleep(SleepDuration)
 
-		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product1.ID), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product1.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -173,9 +160,9 @@ func TestCreateOrderSuccess(t *testing.T) {
 		require.NoError(err)
 		assert.Equal(int32(48), product.StockQuantity)
 
-		req, err = http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product2.ID), nil)
+		req, err = http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product2.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err = client.Do(req)
 		require.NoError(err)
@@ -192,15 +179,15 @@ func TestCreateOrderSuccess(t *testing.T) {
 func TestCreateOrderWithMultipleProducts(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	apiGatewayURL := os.Getenv(apiGatewayURLKey)
+	apiGatewayURL := os.Getenv(ApiGatewayURLKey)
 
-	_, authToken := registerAndLogin(require)
+	_, authToken := RegisterAndLogin(require)
 	require.NotEmpty(authToken)
 
-	product1 := createProduct(require, apiGatewayURL, authToken, "Multi Product 1", 50.00, 100)
-	product2 := createProduct(require, apiGatewayURL, authToken, "Multi Product 2", 75.50, 80)
-	product3 := createProduct(require, apiGatewayURL, authToken, "Multi Product 3", 120.25, 60)
-	product4 := createProduct(require, apiGatewayURL, authToken, "Multi Product 4", 200.00, 40)
+	product1 := CreateProduct(require, apiGatewayURL, authToken, "Multi Product 1", 50.00, 100)
+	product2 := CreateProduct(require, apiGatewayURL, authToken, "Multi Product 2", 75.50, 80)
+	product3 := CreateProduct(require, apiGatewayURL, authToken, "Multi Product 3", 120.25, 60)
+	product4 := CreateProduct(require, apiGatewayURL, authToken, "Multi Product 4", 200.00, 40)
 
 	t.Run("Add Multiple Products to Cart", func(t *testing.T) {
 		products := []struct {
@@ -223,10 +210,10 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 			body, err := json.Marshal(addProductReq)
 			require.NoError(err)
 
-			req, err := http.NewRequest("POST", fmt.Sprintf(apiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
+			req, err := http.NewRequest("POST", fmt.Sprintf(ApiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
 			require.NoError(err)
-			req.Header.Set("Authorization", bearerWithSpace+authToken)
-			req.Header.Set(contentTypeHeader, contentTypeJSON)
+			req.Header.Set("Authorization", BearerWithSpace+authToken)
+			req.Header.Set(ContentTypeHeader, ContentTypeJSON)
 
 			resp, err := client.Do(req)
 			require.NoError(err)
@@ -238,9 +225,9 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 
 	var createdOrder Order
 	t.Run("Create Order with Multiple Products", func(t *testing.T) {
-		req, err := http.NewRequest("POST", fmt.Sprintf(apiOrders, apiGatewayURL), nil)
+		req, err := http.NewRequest("POST", fmt.Sprintf(ApiOrders, apiGatewayURL), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -259,13 +246,13 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 	})
 
 	t.Run("Verify All Products Stock Updated", func(t *testing.T) {
-		time.Sleep(sleepDuration)
+		time.Sleep(SleepDuration)
 
 		client := &http.Client{}
 
-		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product1.ID), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product1.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err := client.Do(req)
 		require.NoError(err)
@@ -276,9 +263,9 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 		require.NoError(err)
 		assert.Equal(int32(97), product.StockQuantity)
 
-		req, err = http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product2.ID), nil)
+		req, err = http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product2.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err = client.Do(req)
 		require.NoError(err)
@@ -288,9 +275,9 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 		require.NoError(err)
 		assert.Equal(int32(78), product.StockQuantity)
 
-		req, err = http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product3.ID), nil)
+		req, err = http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product3.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err = client.Do(req)
 		require.NoError(err)
@@ -300,9 +287,9 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 		require.NoError(err)
 		assert.Equal(int32(59), product.StockQuantity)
 
-		req, err = http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product4.ID), nil)
+		req, err = http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product4.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err = client.Do(req)
 		require.NoError(err)
@@ -314,11 +301,11 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 	})
 
 	t.Run("Verify Cart Cleared After Order", func(t *testing.T) {
-		time.Sleep(sleepDuration)
+		time.Sleep(SleepDuration)
 
-		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf(ApiCarts, apiGatewayURL), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -338,12 +325,12 @@ func TestCreateOrderWithMultipleProducts(t *testing.T) {
 func TestCreateOrderWithSingleProduct(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	apiGatewayURL := os.Getenv(apiGatewayURLKey)
+	apiGatewayURL := os.Getenv(ApiGatewayURLKey)
 
-	_, authToken := registerAndLogin(require)
+	_, authToken := RegisterAndLogin(require)
 	require.NotEmpty(authToken)
 
-	product := createProduct(require, apiGatewayURL, authToken, "Single Product Order", 99.99, 25)
+	product := CreateProduct(require, apiGatewayURL, authToken, "Single Product Order", 99.99, 25)
 
 	t.Run("Add Single Product to Cart", func(t *testing.T) {
 		addProductReq := AddProductToCartRequest{
@@ -354,10 +341,10 @@ func TestCreateOrderWithSingleProduct(t *testing.T) {
 		body, err := json.Marshal(addProductReq)
 		require.NoError(err)
 
-		req, err := http.NewRequest("POST", fmt.Sprintf(apiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
+		req, err := http.NewRequest("POST", fmt.Sprintf(ApiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
-		req.Header.Set(contentTypeHeader, contentTypeJSON)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
+		req.Header.Set(ContentTypeHeader, ContentTypeJSON)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -369,9 +356,9 @@ func TestCreateOrderWithSingleProduct(t *testing.T) {
 
 	var createdOrder Order
 	t.Run("Create Order with Single Product", func(t *testing.T) {
-		req, err := http.NewRequest("POST", fmt.Sprintf(apiOrders, apiGatewayURL), nil)
+		req, err := http.NewRequest("POST", fmt.Sprintf(ApiOrders, apiGatewayURL), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -388,11 +375,11 @@ func TestCreateOrderWithSingleProduct(t *testing.T) {
 	})
 
 	t.Run("Verify Single Product Stock Updated", func(t *testing.T) {
-		time.Sleep(sleepDuration)
+		time.Sleep(SleepDuration)
 
-		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product.ID), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -408,11 +395,11 @@ func TestCreateOrderWithSingleProduct(t *testing.T) {
 	})
 
 	t.Run("Verify Cart Cleared", func(t *testing.T) {
-		time.Sleep(sleepDuration)
+		time.Sleep(SleepDuration)
 
-		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf(ApiCarts, apiGatewayURL), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -432,13 +419,13 @@ func TestCreateOrderWithSingleProduct(t *testing.T) {
 func TestCreateOrderFailureDueToInsufficientStock(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	apiGatewayURL := os.Getenv(apiGatewayURLKey)
+	apiGatewayURL := os.Getenv(ApiGatewayURLKey)
 
-	_, authToken := registerAndLogin(require)
+	_, authToken := RegisterAndLogin(require)
 	require.NotEmpty(authToken)
 
 	initialStock := int32(1)
-	product := createProduct(require, apiGatewayURL, authToken, "Low Stock Product", 10.00, initialStock)
+	product := CreateProduct(require, apiGatewayURL, authToken, "Low Stock Product", 10.00, initialStock)
 	require.NotEmpty(product.ID)
 
 	quantityToOrder := int32(2)
@@ -449,10 +436,10 @@ func TestCreateOrderFailureDueToInsufficientStock(t *testing.T) {
 	body, err := json.Marshal(addProductReq)
 	require.NoError(err)
 
-	req, err := http.NewRequest("POST", fmt.Sprintf(apiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", fmt.Sprintf(ApiCartsProducts, apiGatewayURL), bytes.NewBuffer(body))
 	require.NoError(err)
-	req.Header.Set("Authorization", bearerWithSpace+authToken)
-	req.Header.Set(contentTypeHeader, contentTypeJSON)
+	req.Header.Set("Authorization", BearerWithSpace+authToken)
+	req.Header.Set(ContentTypeHeader, ContentTypeJSON)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -462,9 +449,9 @@ func TestCreateOrderFailureDueToInsufficientStock(t *testing.T) {
 
 	var createdOrder Order
 	t.Run("Create Order with Insufficient Stock", func(t *testing.T) {
-		req, err := http.NewRequest("POST", fmt.Sprintf(apiOrders, apiGatewayURL), nil)
+		req, err := http.NewRequest("POST", fmt.Sprintf(ApiOrders, apiGatewayURL), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err = client.Do(req)
 		require.NoError(err)
@@ -478,12 +465,12 @@ func TestCreateOrderFailureDueToInsufficientStock(t *testing.T) {
 		assert.Equal("CREATED", createdOrder.Status, "Initial order status should be CREATED")
 	})
 
-	time.Sleep(sleepDuration)
+	time.Sleep(SleepDuration)
 
 	t.Run("Verify Stock is NOT Updated", func(t *testing.T) {
-		req, err := http.NewRequest("GET", fmt.Sprintf(apiProductsWithPath, apiGatewayURL, product.ID), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf(ApiProductsWithPath, apiGatewayURL, product.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err := client.Do(req)
 		require.NoError(err)
@@ -498,9 +485,9 @@ func TestCreateOrderFailureDueToInsufficientStock(t *testing.T) {
 	})
 
 	t.Run("Verify Cart is Cleared", func(t *testing.T) {
-		req, err := http.NewRequest("GET", fmt.Sprintf(apiCarts, apiGatewayURL), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf(ApiCarts, apiGatewayURL), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err := client.Do(req)
 		require.NoError(err)

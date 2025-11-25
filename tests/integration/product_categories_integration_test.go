@@ -1,4 +1,4 @@
-package integration_test
+package integration
 
 import (
 	"bytes"
@@ -13,34 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	productCategoriesEndpoint = "api/products/categories"
-)
-
-type ProductCategoryRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-}
-
-type UpdateCategoryRequest struct {
-	ID string `json:"id"`
-	ProductCategoryRequest
-}
-
-type ProductCategory struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt,omitempty"`
-}
-
 func TestProductCategoriesCRUD(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	apiGatewayURL := os.Getenv("API_GATEWAY_URL")
+	apiGatewayURL := os.Getenv(ApiGatewayURLKey)
 
-	_, authToken := registerAndLogin(require)
+	_, authToken := RegisterAndLogin(require)
 	require.NotEmpty(authToken)
 
 	httpClient := &http.Client{}
@@ -55,10 +33,10 @@ func TestProductCategoriesCRUD(t *testing.T) {
 		body, err := json.Marshal(productCategoryReq)
 		require.NoError(err)
 
-		req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s", apiGatewayURL, productCategoriesEndpoint), bytes.NewBuffer(body))
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s", apiGatewayURL, ProductCategoriesEndpoint), bytes.NewBuffer(body))
 		require.NoError(err)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set(ContentTypeHeader, ContentTypeJSON)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err := httpClient.Do(req)
 		require.NoError(err)
@@ -75,7 +53,7 @@ func TestProductCategoriesCRUD(t *testing.T) {
 	})
 
 	t.Run("Get Product Categories", func(t *testing.T) {
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s", apiGatewayURL, productCategoriesEndpoint), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s", apiGatewayURL, ProductCategoriesEndpoint), nil)
 		require.NoError(err)
 
 		resp, err := httpClient.Do(req)
@@ -112,10 +90,10 @@ func TestProductCategoriesCRUD(t *testing.T) {
 		body, err := json.Marshal(updateNameCategory)
 		require.NoError(err)
 
-		req, err := http.NewRequest("PUT", fmt.Sprintf("%s/%s", apiGatewayURL, productCategoriesEndpoint), bytes.NewBuffer(body))
+		req, err := http.NewRequest("PUT", fmt.Sprintf("%s/%s", apiGatewayURL, ProductCategoriesEndpoint), bytes.NewBuffer(body))
 		require.NoError(err)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set(ContentTypeHeader, ContentTypeJSON)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err := httpClient.Do(req)
 		require.NoError(err)
@@ -126,9 +104,9 @@ func TestProductCategoriesCRUD(t *testing.T) {
 	})
 
 	t.Run("Delete Product Category", func(t *testing.T) {
-		req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/%s/%s", apiGatewayURL, productCategoriesEndpoint, createdProductCategories.ID), nil)
+		req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/%s/%s", apiGatewayURL, ProductCategoriesEndpoint, createdProductCategories.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", bearerWithSpace+authToken)
+		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err := httpClient.Do(req)
 		require.NoError(err)
