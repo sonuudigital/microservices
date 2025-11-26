@@ -145,7 +145,7 @@ func RegisterAndLogin(require *require.Assertions) (User, string) {
 	return loginResp.User, loginResp.Token
 }
 
-func CreateProduct(require *require.Assertions, apiGatewayURL, authToken, name string, price float64, stockQuantity int32) Product {
+func CreateProduct(require *require.Assertions, apiGatewayURL, authToken, name string, price float64, stockQuantity int32, description ...string) Product {
 	categoryReq := ProductCategoryRequest{
 		Name:        fmt.Sprintf("Category for %s", name),
 		Description: fmt.Sprintf("Auto-generated category for %s", name),
@@ -170,10 +170,15 @@ func CreateProduct(require *require.Assertions, apiGatewayURL, authToken, name s
 	err = json.NewDecoder(resp.Body).Decode(&category)
 	require.NoError(err)
 
+	desc := fmt.Sprintf("Description for %s", name)
+	if len(description) > 0 {
+		desc = description[0]
+	}
+
 	productReq := Product{
 		CategoryID:    category.ID,
 		Name:          name,
-		Description:   fmt.Sprintf("Description for %s", name),
+		Description:   desc,
 		Price:         price,
 		StockQuantity: stockQuantity,
 	}

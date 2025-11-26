@@ -75,6 +75,11 @@ func (h *ProductHandler) SearchProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if searchRes.Hits.Total.Value == 0 {
+		web.RespondWithError(w, h.logger, r, http.StatusNotFound, "No products found", "No results match the search query")
+		return
+	}
+
 	products := make([]events.Product, len(searchRes.Hits.Hits))
 	for i, hit := range searchRes.Hits.Hits {
 		products[i] = hit.Source
