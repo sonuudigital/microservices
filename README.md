@@ -13,6 +13,7 @@ The project follows a microservices architecture. Key components include:
 *   **Order Service ([`order-service`](order-service)):** Orchestrates the order creation process, communicating with the Cart, Product, and Payment services. It implements the Saga and Outbox patterns to ensure data consistency across services.
 *   **Payment Service ([`payment-service`](payment-service)):** Simulates payment processing for orders. It's an internal service called by the Order Service.
 *   **Notification Service ([`notification-service`](notification-service)):** Consumes events from RabbitMQ and sends email notifications to users. It uses MailHog for local email testing.
+*   **Search Service ([`search-service`](search-service)):** Consumes product events from RabbitMQ to index products in OpenSearch, providing full-text search capabilities via the API Gateway.
 *   **Shared ([`shared`](shared)):** A shared module containing common code for authentication, logging, and database connections.
 *   **Protobufs ([`protos`](protos)):** Contains all gRPC service definitions for the project.
 
@@ -50,7 +51,9 @@ This command builds and starts all services. For production, a `docker-compose.p
 *   Order Service (gRPC): Internal (port 9084)
 *   Payment Service (gRPC): Internal (port 9085)
 *   Notification Service: Internal (consumes events from RabbitMQ)
+*   Search Service: Internal (port 8080, exposed via API Gateway)
 *   PostgreSQL Databases: Separate instances for each service.
+*   OpenSearch: `http://localhost:9200`
 *   pgAdmin: `http://localhost:5050`
 *   RabbitMQ: `http://localhost:15672`
 *   MailHog (SMTP Server): `http://localhost:8025`
@@ -94,6 +97,7 @@ The project includes both unit and integration tests.
 - `PUT /api/products/categories` - Update a product category (protected)
 - `DELETE /api/products/categories/{id}` - Delete a product category (protected)
 - `GET /api/products/categories/{categoryId}` - Get products by category ID
+- `GET /api/search/products?q={query}` - Search for products
 - `GET /api/carts` - Get user's cart (protected)
 - `POST /api/carts/products` - Add product to cart (protected)
 - `DELETE /api/carts/products/{productId}` - Remove product from cart (protected)
