@@ -43,11 +43,11 @@ func TestProductSearch(t *testing.T) {
 
 	req := require.New(t)
 	apiGatewayURL := os.Getenv(integration.ApiGatewayURLKey)
-	_, authToken := integration.RegisterAndLogin(req)
+	auth := integration.RegisterAndLogin(req)
 
 	timestamp := time.Now().UnixNano()
 	productNames := generateProductNames(timestamp)
-	createdProducts := seedProducts(req, apiGatewayURL, authToken, productNames)
+	createdProducts := seedProducts(req, auth.Client, apiGatewayURL, productNames)
 
 	t.Logf("Waiting for products to be indexed in OpenSearch (timestamp: %d)...", timestamp)
 	waitForIndexing(t, apiGatewayURL, fmt.Sprintf("%d", timestamp))
@@ -69,16 +69,16 @@ func TestProductDeletion(t *testing.T) {
 
 	req := require.New(t)
 	apiGatewayURL := os.Getenv(integration.ApiGatewayURLKey)
-	_, authToken := integration.RegisterAndLogin(req)
+	auth := integration.RegisterAndLogin(req)
 
 	timestamp := time.Now().UnixNano()
 	productName := fmt.Sprintf("ProductToDelete %d", timestamp)
 
-	product := integration.CreateProduct(req, apiGatewayURL, authToken, productName, 50.00, 5)
+	product := integration.CreateProduct(req, auth.Client, apiGatewayURL, productName, 50.00, 5)
 	t.Logf("Created product to delete: %s (ID: %s)", productName, product.ID)
 
 	waitForIndexing(t, apiGatewayURL, productName)
-	deleteProduct(t, req, apiGatewayURL, authToken, product.ID)
+	deleteProduct(t, req, apiGatewayURL, auth.Client, product.ID)
 	waitForDeletion(t, apiGatewayURL, productName, product.ID)
 }
 
@@ -90,7 +90,7 @@ func generateProductNames(timestamp int64) map[string]string {
 	}
 }
 
-func seedProducts(req *require.Assertions, apiGatewayURL, authToken string, names map[string]string) []integration.Product {
+func seedProducts(req *require.Assertions, client *http.Client, apiGatewayURL string, names map[string]string) []integration.Product {
 	productsToSeed := []struct {
 		Name        string
 		Description string
@@ -115,7 +115,7 @@ func seedProducts(req *require.Assertions, apiGatewayURL, authToken string, name
 
 	createdProducts := make([]integration.Product, 0, len(productsToSeed))
 	for _, p := range productsToSeed {
-		prod := integration.CreateProduct(req, apiGatewayURL, authToken, p.Name, p.Price, 10, p.Description)
+		prod := integration.CreateProduct(req, client, apiGatewayURL, p.Name, p.Price, 10, p.Description)
 		createdProducts = append(createdProducts, prod)
 	}
 	return createdProducts
@@ -231,13 +231,10 @@ func verifyExpectedNames(asrt *assert.Assertions, matched []SearchResultProduct,
 	}
 }
 
-func deleteProduct(t *testing.T, req *require.Assertions, apiGatewayURL, authToken, productID string) {
+func deleteProduct(t *testing.T, req *require.Assertions, apiGatewayURL string, client *http.Client, productID string) {
 	deleteURL := fmt.Sprintf(integration.ApiProductsWithPath, apiGatewayURL, productID)
 	httpReq, err := http.NewRequest("DELETE", deleteURL, nil)
 	req.NoError(err)
-	httpReq.Header.Set("Authorization", "Bearer "+authToken)
-
-	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	req.NoError(err)
 	defer resp.Body.Close()

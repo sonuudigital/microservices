@@ -18,10 +18,10 @@ func TestProductCategoriesCRUD(t *testing.T) {
 	assert := assert.New(t)
 	apiGatewayURL := os.Getenv(ApiGatewayURLKey)
 
-	_, authToken := RegisterAndLogin(require)
-	require.NotEmpty(authToken)
+	auth := RegisterAndLogin(require)
+	require.NotEmpty(auth.User.ID)
 
-	httpClient := &http.Client{}
+	httpClient := auth.Client
 	var createdProductCategories ProductCategory
 
 	t.Run("Create Product Category", func(t *testing.T) {
@@ -36,7 +36,6 @@ func TestProductCategoriesCRUD(t *testing.T) {
 		req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s", apiGatewayURL, ProductCategoriesEndpoint), bytes.NewBuffer(body))
 		require.NoError(err)
 		req.Header.Set(ContentTypeHeader, ContentTypeJSON)
-		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err := httpClient.Do(req)
 		require.NoError(err)
@@ -93,7 +92,6 @@ func TestProductCategoriesCRUD(t *testing.T) {
 		req, err := http.NewRequest("PUT", fmt.Sprintf("%s/%s", apiGatewayURL, ProductCategoriesEndpoint), bytes.NewBuffer(body))
 		require.NoError(err)
 		req.Header.Set(ContentTypeHeader, ContentTypeJSON)
-		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err := httpClient.Do(req)
 		require.NoError(err)
@@ -106,7 +104,6 @@ func TestProductCategoriesCRUD(t *testing.T) {
 	t.Run("Delete Product Category", func(t *testing.T) {
 		req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/%s/%s", apiGatewayURL, ProductCategoriesEndpoint, createdProductCategories.ID), nil)
 		require.NoError(err)
-		req.Header.Set("Authorization", BearerWithSpace+authToken)
 
 		resp, err := httpClient.Do(req)
 		require.NoError(err)
