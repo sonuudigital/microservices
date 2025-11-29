@@ -86,6 +86,8 @@ func verifyEnvironmentServiceURLs(logger logs.Logger) bool {
 		"ORDER_SERVICE_GRPC_URL",
 		"SEARCH_SERVICE_URL",
 		"REDIS_URL",
+		"COOKIE_AUTH_NAME",
+		"ENV",
 	}
 
 	for _, envVar := range requiredEnvVars {

@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"time"
 
 	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/auth"
@@ -26,11 +28,6 @@ type UserResponse struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
-}
-
-type LoginResponse struct {
-	User  UserResponse `json:"user"`
-	Token string       `json:"token"`
 }
 
 const (
@@ -82,9 +79,32 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := LoginResponse{
-		User:  user,
-		Token: token,
+	authCookie := http.Cookie{
+		Name:     os.Getenv("COOKIE_AUTH_NAME"),
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   os.Getenv("ENV") == "prod",
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(h.jwtManager.TTL()),
+		MaxAge:   int(h.jwtManager.TTL().Seconds()),
 	}
-	web.RespondWithJSON(w, h.logger, http.StatusOK, response)
+	http.SetCookie(w, &authCookie)
+
+	web.RespondWithJSON(w, h.logger, http.StatusOK, user)
+}
+
+func (h *AuthHandler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	authCookie := http.Cookie{
+		Name:     os.Getenv("COOKIE_AUTH_NAME"),
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   os.Getenv("ENV") == "prod",
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(-time.Second),
+		MaxAge:   -1,
+	}
+	http.SetCookie(w, &authCookie)
+	web.RespondWithJSON(w, h.logger, http.StatusOK, map[string]string{"message": "Logged out successfully"})
 }
