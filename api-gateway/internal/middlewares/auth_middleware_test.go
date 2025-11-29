@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -26,6 +27,13 @@ const (
 
 func TestAuthMiddleware(t *testing.T) {
 	logger := logs.NewSlogLogger()
+
+	os.Setenv("COOKIE_AUTH_NAME", "auth_token")
+	os.Setenv("ENV", "test")
+	t.Cleanup(func() {
+		os.Unsetenv("COOKIE_AUTH_NAME")
+		os.Unsetenv("ENV")
+	})
 
 	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.NoError(t, err)
@@ -55,7 +63,10 @@ func TestAuthMiddleware(t *testing.T) {
 		assert.NoError(t, err)
 
 		req, _ := http.NewRequest("GET", protectedURL, nil)
-		req.Header.Set("Authorization", "Bearer "+token)
+		req.AddCookie(&http.Cookie{
+			Name:  os.Getenv("COOKIE_AUTH_NAME"),
+			Value: token,
+		})
 		rr := httptest.NewRecorder()
 
 		handlerToTest.ServeHTTP(rr, req)
@@ -74,12 +85,15 @@ func TestAuthMiddleware(t *testing.T) {
 		var problem web.ProblemDetail
 		err := json.NewDecoder(rr.Body).Decode(&problem)
 		assert.NoError(t, err)
-		assert.Equal(t, "Missing authorization header.", problem.Detail)
+		assert.Equal(t, "Missing authentication cookie.", problem.Detail)
 	})
 
 	t.Run("Invalid Token", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", protectedURL, nil)
-		req.Header.Set("Authorization", "Bearer invalid-token")
+		req.AddCookie(&http.Cookie{
+			Name:  os.Getenv("COOKIE_AUTH_NAME"),
+			Value: "invalid-token",
+		})
 		rr := httptest.NewRecorder()
 
 		handlerToTest.ServeHTTP(rr, req)
@@ -91,20 +105,6 @@ func TestAuthMiddleware(t *testing.T) {
 		assert.Equal(t, "Invalid or expired token.", problem.Detail)
 	})
 
-	t.Run("Malformed Header", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", protectedURL, nil)
-		req.Header.Set("Authorization", "NotBearer some-token")
-		rr := httptest.NewRecorder()
-
-		handlerToTest.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		var problem web.ProblemDetail
-		err := json.NewDecoder(rr.Body).Decode(&problem)
-		assert.NoError(t, err)
-		assert.Equal(t, "Invalid authorization header format.", problem.Detail)
-	})
-
 	t.Run("Expired Token", func(t *testing.T) {
 		shortLivedJwtManager, err := auth.NewJWTManager(privKeyPem, pubKeyPem, "test-issuer", "test-audience", -1*time.Minute)
 		assert.NoError(t, err)
@@ -112,7 +112,10 @@ func TestAuthMiddleware(t *testing.T) {
 		assert.NoError(t, err)
 
 		req, _ := http.NewRequest("GET", protectedURL, nil)
-		req.Header.Set("Authorization", "Bearer "+token)
+		req.AddCookie(&http.Cookie{
+			Name:  os.Getenv("COOKIE_AUTH_NAME"),
+			Value: token,
+		})
 		rr := httptest.NewRecorder()
 
 		handlerToTest.ServeHTTP(rr, req)

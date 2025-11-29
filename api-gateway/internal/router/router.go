@@ -45,6 +45,7 @@ func configAuthAndUserRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandl
 	mux.Handle("GET /api/users/{id}", authMiddleware(http.HandlerFunc(userHandler.GetUserByIDHandler)))
 	mux.HandleFunc("POST /api/users", userHandler.CreateUserHandler)
 	mux.HandleFunc("POST /api/auth/login", authHandler.LoginHandler)
+	mux.HandleFunc("POST /api/auth/logout", authHandler.LogoutHandler)
 }
 
 func configProductRoutes(mux *http.ServeMux, productHandler *handlers.ProductHandler, authMiddleware authMiddleware) {

@@ -3,7 +3,7 @@ package middlewares
 import (
 	"context"
 	"net/http"
-	"strings"
+	"os"
 
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
@@ -17,19 +17,17 @@ const userClaimsKey contextKey = "userClaims"
 func AuthMiddleware(jwtManager *auth.JWTManager, logger logs.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				web.RespondWithError(w, logger, r, http.StatusUnauthorized, "Unauthorized", "Missing authorization header.")
+			cookie, err := r.Cookie(os.Getenv("COOKIE_AUTH_NAME"))
+			if err != nil {
+				if err == http.ErrNoCookie {
+					web.RespondWithError(w, logger, r, http.StatusUnauthorized, "Unauthorized", "Missing authentication cookie.")
+					return
+				}
+				web.RespondWithError(w, logger, r, http.StatusBadRequest, "Bad Request", "Invalid authentication cookie.")
 				return
 			}
 
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-				web.RespondWithError(w, logger, r, http.StatusUnauthorized, "Unauthorized", "Invalid authorization header format.")
-				return
-			}
-
-			tokenString := parts[1]
+			tokenString := cookie.Value
 
 			claims, err := jwtManager.ValidateToken(tokenString)
 			if err != nil {

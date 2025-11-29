@@ -135,3 +135,7 @@ func classifyJWTError(err error) error {
 		return err
 	}
 }
+
+func (j *JWTManager) TTL() time.Duration {
+	return j.ttl
+}

@@ -11,11 +11,12 @@ import (
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
-	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/api-gateway/internal/handlers"
+	userv1 "github.com/sonuudigital/microservices/gen/user/v1"
 	"github.com/sonuudigital/microservices/shared/auth"
 	"github.com/sonuudigital/microservices/shared/logs"
 	"github.com/stretchr/testify/assert"
@@ -61,6 +62,11 @@ func (m *mockUserServiceClient) GetUserByID(ctx context.Context, in *userv1.GetU
 func TestLoginHandler(t *testing.T) {
 	logger := logs.NewSlogLogger()
 
+	os.Setenv("COOKIE_AUTH_NAME", "auth_token")
+	t.Cleanup(func() {
+		os.Unsetenv("COOKIE_AUTH_NAME")
+	})
+
 	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.NoError(t, err)
 
@@ -79,7 +85,7 @@ func TestLoginHandler(t *testing.T) {
 		mockClient := new(mockUserServiceClient)
 		authHandler := handlers.NewAuthHandler(logger, jwtManager, mockClient)
 
-		mockClient.On("AuthorizeUser", mock.Anything, mock.Anything).Return(&userv1.User{Id: "user-123", Email: emailTest}, nil).Once()
+		mockClient.On("AuthorizeUser", mock.Anything, mock.Anything).Return(&userv1.User{Id: "user-123", Email: emailTest, Username: "testuser"}, nil).Once()
 
 		loginReq := handlers.LoginRequest{Email: emailTest, Password: "password"}
 		body, _ := json.Marshal(loginReq)
@@ -89,10 +95,21 @@ func TestLoginHandler(t *testing.T) {
 		authHandler.LoginHandler(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		var resp handlers.LoginResponse
+		var resp handlers.UserResponse
 		err := json.NewDecoder(rr.Body).Decode(&resp)
 		assert.NoError(t, err)
-		assert.NotEmpty(t, resp.Token)
+		assert.Equal(t, "user-123", resp.ID)
+		assert.Equal(t, emailTest, resp.Email)
+		assert.Equal(t, "testuser", resp.Username)
+
+		cookie := rr.Result().Cookies()
+		assert.Len(t, cookie, 1)
+		assert.Equal(t, "auth_token", cookie[0].Name)
+		assert.NotEmpty(t, cookie[0].Value)
+		assert.True(t, cookie[0].HttpOnly)
+		assert.Equal(t, "/", cookie[0].Path)
+		assert.Equal(t, http.SameSiteStrictMode, cookie[0].SameSite)
+
 		mockClient.AssertExpectations(t)
 	})
 
@@ -129,4 +146,83 @@ func TestLoginHandler(t *testing.T) {
 		assert.Equal(t, http.StatusServiceUnavailable, rr.Code)
 		mockClient.AssertExpectations(t)
 	})
+}
+
+func TestLogoutHandler(t *testing.T) {
+	logger := logs.NewSlogLogger()
+
+	os.Setenv("COOKIE_AUTH_NAME", "auth_token")
+	t.Cleanup(func() {
+		os.Unsetenv("COOKIE_AUTH_NAME")
+		os.Unsetenv("ENV")
+	})
+
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.NoError(t, err)
+
+	privKeyBytes, err := x509.MarshalECPrivateKey(privKey)
+	assert.NoError(t, err)
+	privKeyPem := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: privKeyBytes})
+
+	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	assert.NoError(t, err)
+	pubKeyPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubKeyBytes})
+
+	jwtManager, err := auth.NewJWTManager(privKeyPem, pubKeyPem, "test-issuer", "test-audience", 15*time.Minute)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name   string
+		env    string
+		secure bool
+	}{
+		{name: "EnvDevSecureFalse", env: "dev", secure: false},
+		{name: "EnvProdSecureTrue", env: "prod", secure: true},
+		{name: "EnvEmptySecureFalse", env: "", secure: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != "" {
+				os.Setenv("ENV", tt.env)
+			} else {
+				os.Unsetenv("ENV")
+			}
+
+			mockClient := new(mockUserServiceClient)
+			authHandler := handlers.NewAuthHandler(logger, jwtManager, mockClient)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+			rr := httptest.NewRecorder()
+
+			req.AddCookie(&http.Cookie{
+				Name:     "auth_token",
+				Value:    "token",
+				Path:     "/",
+				HttpOnly: true,
+			})
+
+			authHandler.LogoutHandler(rr, req)
+
+			assert.Equal(t, http.StatusOK, rr.Code)
+
+			var clearedCookie *http.Cookie
+			cookies := rr.Result().Cookies()
+			for i := len(cookies) - 1; i >= 0; i-- {
+				if cookies[i].Name == "auth_token" {
+					clearedCookie = cookies[i]
+					break
+				}
+			}
+
+			assert.NotNil(t, clearedCookie)
+			assert.Equal(t, "", clearedCookie.Value)
+			assert.Equal(t, "/", clearedCookie.Path)
+			assert.True(t, clearedCookie.HttpOnly)
+			assert.Equal(t, http.SameSiteStrictMode, clearedCookie.SameSite)
+			assert.Equal(t, -1, clearedCookie.MaxAge)
+			assert.True(t, clearedCookie.Expires.Before(time.Now()))
+			assert.Equal(t, tt.secure, clearedCookie.Secure)
+		})
+	}
 }
