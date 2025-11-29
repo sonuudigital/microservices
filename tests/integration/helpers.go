@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"time"
 
@@ -23,20 +24,19 @@ const (
 	ProductCategoriesEndpoint = "api/products/categories"
 	ContentTypeJSON           = "application/json"
 	ContentTypeHeader         = "Content-Type"
-	BearerWithSpace           = "Bearer "
 	CreateProductStepMsg      = "Create Product step must run first"
 	SleepDuration             = 6 * time.Second
 )
+
+type AuthenticatedClient struct {
+	Client *http.Client
+	User   User
+}
 
 type User struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
-}
-
-type LoginResponse struct {
-	User  User   `json:"user"`
-	Token string `json:"token"`
 }
 
 type Product struct {
@@ -103,12 +103,16 @@ type Order struct {
 	CreatedAt   string  `json:"createdAt"`
 }
 
-func RegisterAndLogin(require *require.Assertions) (User, string) {
+func RegisterAndLogin(require *require.Assertions) *AuthenticatedClient {
 	apiGatewayURL := os.Getenv(ApiGatewayURLKey)
 
 	email := fmt.Sprintf("testuser_%d@example.com", time.Now().UnixNano())
 	username := fmt.Sprintf("testuser_%d", time.Now().UnixNano())
 	password := "password123"
+
+	jar, err := cookiejar.New(nil)
+	require.NoError(err)
+	client := &http.Client{Jar: jar}
 
 	createUserReqBody, err := json.Marshal(map[string]string{
 		"username": username,
@@ -130,22 +134,21 @@ func RegisterAndLogin(require *require.Assertions) (User, string) {
 	require.NoError(err)
 
 	loginURL := fmt.Sprintf("%s/api/auth/login", apiGatewayURL)
-	resp, err = http.Post(loginURL, ContentTypeJSON, bytes.NewBuffer(loginReqBody))
+	resp, err = client.Post(loginURL, ContentTypeJSON, bytes.NewBuffer(loginReqBody))
 	require.NoError(err)
 	defer resp.Body.Close()
 	require.Equal(http.StatusOK, resp.StatusCode)
 
-	var loginResp LoginResponse
-	err = json.NewDecoder(resp.Body).Decode(&loginResp)
+	var user User
+	err = json.NewDecoder(resp.Body).Decode(&user)
 	require.NoError(err)
-	require.NotEmpty(loginResp.Token)
-	require.NotEmpty(loginResp.User.ID)
-	require.Equal(email, loginResp.User.Email)
+	require.NotEmpty(user.ID)
+	require.Equal(email, user.Email)
 
-	return loginResp.User, loginResp.Token
+	return &AuthenticatedClient{Client: client, User: user}
 }
 
-func CreateProduct(require *require.Assertions, apiGatewayURL, authToken, name string, price float64, stockQuantity int32, description ...string) Product {
+func CreateProduct(require *require.Assertions, client *http.Client, apiGatewayURL, name string, price float64, stockQuantity int32, description ...string) Product {
 	categoryReq := ProductCategoryRequest{
 		Name:        fmt.Sprintf("Category for %s", name),
 		Description: fmt.Sprintf("Auto-generated category for %s", name),
@@ -156,10 +159,7 @@ func CreateProduct(require *require.Assertions, apiGatewayURL, authToken, name s
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s", apiGatewayURL, ProductCategoriesEndpoint), bytes.NewBuffer(body))
 	require.NoError(err)
-	req.Header.Set("Authorization", BearerWithSpace+authToken)
 	req.Header.Set(ContentTypeHeader, ContentTypeJSON)
-
-	client := &http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(err)
 	defer resp.Body.Close()
@@ -188,9 +188,7 @@ func CreateProduct(require *require.Assertions, apiGatewayURL, authToken, name s
 
 	req, err = http.NewRequest("POST", fmt.Sprintf("%s/api/products", apiGatewayURL), bytes.NewBuffer(body))
 	require.NoError(err)
-	req.Header.Set("Authorization", BearerWithSpace+authToken)
 	req.Header.Set(ContentTypeHeader, ContentTypeJSON)
-
 	resp, err = client.Do(req)
 	require.NoError(err)
 	defer resp.Body.Close()
